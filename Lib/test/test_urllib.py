@@ -3,12 +3,15 @@
 import urllib
 import httplib
 import unittest
-from test import test_support
 import os
 import sys
 import mimetools
 import tempfile
 import StringIO
+
+from test import test_support
+from base64 import b64encode
+
 
 def hexescape(char):
     """Escape char as RFC 2396 specifies"""
@@ -22,8 +25,9 @@ class FakeHTTPMixin(object):
     def fakehttp(self, fakedata):
         class FakeSocket(StringIO.StringIO):
 
-            def sendall(self, str):
-                pass
+            def sendall(self, data):
+                FakeHTTPConnection.buf = data
+
             def makefile(self, *args, **kwds):
                 return self
 
@@ -38,9 +42,15 @@ class FakeHTTPMixin(object):
                 return StringIO.StringIO.readline(self, length)
 
         class FakeHTTPConnection(httplib.HTTPConnection):
+
+            # buffer to store data for verification in urlopen tests.
+            buf = ""
+
             def connect(self):
                 self.sock = FakeSocket(fakedata)
+
         assert httplib.HTTP._connection_class == httplib.HTTPConnection
+
         httplib.HTTP._connection_class = FakeHTTPConnection
 
     def unfakehttp(self):
@@ -123,6 +133,9 @@ class urlopen_FileTests(unittest.TestCase):
         # comparison
         for line in self.returned_obj.__iter__():
             self.assertEqual(line, self.text)
+
+    def test_relativelocalfile(self):
+        self.assertRaises(ValueError,urllib.urlopen,'./' + self.pathname)
 
 class ProxyTests(unittest.TestCase):
 
@@ -208,6 +221,62 @@ Content-Type: text/html; charset=iso-8859-1
             self.assertRaises(IOError, urllib.urlopen, 'http://something')
         finally:
             self.unfakehttp()
+
+    def test_missing_localfile(self):
+        self.assertRaises(IOError, urllib.urlopen,
+                'file://localhost/a/missing/file.py')
+        fd, tmp_file = tempfile.mkstemp()
+        tmp_fileurl = 'file://localhost/' + tmp_file.replace(os.path.sep, '/')
+        self.assertTrue(os.path.exists(tmp_file))
+        try:
+            fp = urllib.urlopen(tmp_fileurl)
+            fp.close()
+        finally:
+            os.close(fd)
+            os.unlink(tmp_file)
+
+        self.assertFalse(os.path.exists(tmp_file))
+        self.assertRaises(IOError, urllib.urlopen, tmp_fileurl)
+
+    def test_ftp_nonexisting(self):
+        self.assertRaises(IOError, urllib.urlopen,
+                'ftp://localhost/not/existing/file.py')
+
+
+    def test_userpass_inurl(self):
+        self.fakehttp('Hello!')
+        try:
+            fakehttp_wrapper = httplib.HTTP._connection_class
+            fp = urllib.urlopen("http://user:pass@python.org/")
+            authorization = ("Authorization: Basic %s\r\n" %
+                            b64encode('user:pass'))
+            # The authorization header must be in place
+            self.assertIn(authorization, fakehttp_wrapper.buf)
+            self.assertEqual(fp.readline(), "Hello!")
+            self.assertEqual(fp.readline(), "")
+            self.assertEqual(fp.geturl(), 'http://user:pass@python.org/')
+            self.assertEqual(fp.getcode(), 200)
+        finally:
+            self.unfakehttp()
+
+    def test_userpass_with_spaces_inurl(self):
+        self.fakehttp('Hello!')
+        try:
+            url = "http://a b:c d@python.org/"
+            fakehttp_wrapper = httplib.HTTP._connection_class
+            authorization = ("Authorization: Basic %s\r\n" %
+                             b64encode('a b:c d'))
+            fp = urllib.urlopen(url)
+            # The authorization header must be in place
+            self.assertIn(authorization, fakehttp_wrapper.buf)
+            self.assertEqual(fp.readline(), "Hello!")
+            self.assertEqual(fp.readline(), "")
+            # the spaces are quoted in URL so no match
+            self.assertNotEqual(fp.geturl(), url)
+            self.assertEqual(fp.getcode(), 200)
+        finally:
+            self.unfakehttp()
+
 
 class urlretrieve_FileTests(unittest.TestCase):
     """Test urllib.urlretrieve() on local files"""
@@ -716,6 +785,29 @@ class Utility_Tests(unittest.TestCase):
         self.assertEqual(('user', 'a\fb'),urllib.splitpasswd('user:a\fb'))
         self.assertEqual(('user', 'a\vb'),urllib.splitpasswd('user:a\vb'))
         self.assertEqual(('user', 'a:b'),urllib.splitpasswd('user:a:b'))
+        self.assertEqual(('user', 'a b'),urllib.splitpasswd('user:a b'))
+        self.assertEqual(('user 2', 'ab'),urllib.splitpasswd('user 2:ab'))
+        self.assertEqual(('user+1', 'a+b'),urllib.splitpasswd('user+1:a+b'))
+
+    def test_splitport(self):
+        splitport = urllib.splitport
+        self.assertEqual(splitport('parrot:88'), ('parrot', '88'))
+        self.assertEqual(splitport('parrot'), ('parrot', None))
+        self.assertEqual(splitport('parrot:'), ('parrot', None))
+        self.assertEqual(splitport('127.0.0.1'), ('127.0.0.1', None))
+        self.assertEqual(splitport('parrot:cheese'), ('parrot:cheese', None))
+
+    def test_splitnport(self):
+        splitnport = urllib.splitnport
+        self.assertEqual(splitnport('parrot:88'), ('parrot', 88))
+        self.assertEqual(splitnport('parrot'), ('parrot', -1))
+        self.assertEqual(splitnport('parrot', 55), ('parrot', 55))
+        self.assertEqual(splitnport('parrot:'), ('parrot', -1))
+        self.assertEqual(splitnport('parrot:', 55), ('parrot', 55))
+        self.assertEqual(splitnport('127.0.0.1'), ('127.0.0.1', -1))
+        self.assertEqual(splitnport('127.0.0.1', 55), ('127.0.0.1', 55))
+        self.assertEqual(splitnport('parrot:cheese'), ('parrot', None))
+        self.assertEqual(splitnport('parrot:cheese', 55), ('parrot', None))
 
 
 class URLopener_Tests(unittest.TestCase):
@@ -740,7 +832,7 @@ class URLopener_Tests(unittest.TestCase):
 # Everywhere else they work ok, but on those machines, sometimes
 # fail in one of the tests, sometimes in other. I have a linux, and
 # the tests go ok.
-# If anybody has one of the problematic enviroments, please help!
+# If anybody has one of the problematic environments, please help!
 # .   Facundo
 #
 # def server(evt):
@@ -786,7 +878,7 @@ class URLopener_Tests(unittest.TestCase):
 #     def testTimeoutNone(self):
 #         # global default timeout is ignored
 #         import socket
-#         self.assertTrue(socket.getdefaulttimeout() is None)
+#         self.assertIsNone(socket.getdefaulttimeout())
 #         socket.setdefaulttimeout(30)
 #         try:
 #             ftp = urllib.ftpwrapper("myuser", "mypass", "localhost", 9093, [])
@@ -798,7 +890,7 @@ class URLopener_Tests(unittest.TestCase):
 #     def testTimeoutDefault(self):
 #         # global default timeout is used
 #         import socket
-#         self.assertTrue(socket.getdefaulttimeout() is None)
+#         self.assertIsNone(socket.getdefaulttimeout())
 #         socket.setdefaulttimeout(30)
 #         try:
 #             ftp = urllib.ftpwrapper("myuser", "mypass", "localhost", 9093, [])

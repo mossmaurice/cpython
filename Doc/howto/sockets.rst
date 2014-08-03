@@ -1,3 +1,5 @@
+.. _socket-howto:
+
 ****************************
   Socket Programming HOWTO
 ****************************
@@ -16,12 +18,6 @@
 
 Sockets
 =======
-
-Sockets are used nearly everywhere, but are one of the most severely
-misunderstood technologies around. This is a 10,000 foot overview of sockets.
-It's not really a tutorial - you'll still have work to do in getting things
-working. It doesn't cover the fine points (and there are a lot of them), but I
-hope it will give you enough background to begin using them decently.
 
 I'm only going to talk about INET sockets, but they account for at least 99% of
 the sockets in use. And I'll only talk about STREAM sockets - unless you really
@@ -86,9 +82,11 @@ creates a "server socket"::
    serversocket.listen(5)
 
 A couple things to notice: we used ``socket.gethostname()`` so that the socket
-would be visible to the outside world. If we had used ``s.bind(('', 80))`` or
-``s.bind(('localhost', 80))`` or ``s.bind(('127.0.0.1', 80))`` we would still
-have a "server" socket, but one that was only visible within the same machine.
+would be visible to the outside world.  If we had used ``s.bind(('localhost',
+80))`` or ``s.bind(('127.0.0.1', 80))`` we would still have a "server" socket,
+but one that was only visible within the same machine.  ``s.bind(('', 80))``
+specifies that the socket is reachable by any address the machine happens to
+have.
 
 A second thing to note: low number ports are usually reserved for "well known"
 services (HTTP, SNMP etc). If you're playing around, use a nice high number (4
@@ -154,7 +152,7 @@ I'm not going to talk about it here, except to warn you that you need to use
 there, you may wait forever for the reply, because the request may still be in
 your output buffer.
 
-Now we come the major stumbling block of sockets - ``send`` and ``recv`` operate
+Now we come to the major stumbling block of sockets - ``send`` and ``recv`` operate
 on the network buffers. They do not necessarily handle all the bytes you hand
 them (or expect from them), because their major focus is handling the network
 buffers. In general, they return when the associated network buffers have been
@@ -165,7 +163,7 @@ been completely dealt with.
 When a ``recv`` returns 0 bytes, it means the other side has closed (or is in
 the process of closing) the connection.  You will not receive any more data on
 this connection. Ever.  You may be able to send data successfully; I'll talk
-about that some on the next page.
+more about this later.
 
 A protocol like HTTP uses a socket for only one transfer. The client sends a
 request, then reads a reply.  That's it. The socket is discarded. This means that
@@ -209,13 +207,15 @@ length message::
                totalsent = totalsent + sent
 
        def myreceive(self):
-           msg = ''
-           while len(msg) < MSGLEN:
-               chunk = self.sock.recv(MSGLEN-len(msg))
+           chunks = []
+           bytes_recd = 0
+           while bytes_recd < MSGLEN:
+               chunk = self.sock.recv(min(MSGLEN - bytes_recd, 2048))
                if chunk == '':
                    raise RuntimeError("socket connection broken")
-               msg = msg + chunk
-           return msg
+               chunks.append(chunk)
+               bytes_recd = bytes_recd + len(chunk)
+           return ''.join(chunks)
 
 The sending code here is usable for almost any messaging scheme - in Python you
 send strings, and you can use ``len()`` to determine its length (even if it has

@@ -128,6 +128,7 @@ PyAPI_FUNC(int) _PyInt_Init(void);
 PyAPI_FUNC(int) _PyLong_Init(void);
 PyAPI_FUNC(void) _PyFloat_Init(void);
 PyAPI_FUNC(int) PyByteArray_Init(void);
+PyAPI_FUNC(void) _PyRandom_Init(void);
 
 /* Various internal finalizers */
 PyAPI_FUNC(void) _PyExc_Fini(void);
@@ -144,6 +145,8 @@ PyAPI_FUNC(void) PyInt_Fini(void);
 PyAPI_FUNC(void) PyFloat_Fini(void);
 PyAPI_FUNC(void) PyOS_FiniInterrupts(void);
 PyAPI_FUNC(void) PyByteArray_Fini(void);
+
+PyAPI_DATA(PyThreadState *) _Py_Finalizing;
 
 /* Stuff with no proper home (yet) */
 PyAPI_FUNC(char *) PyOS_Readline(FILE *, FILE *, char *);
@@ -171,6 +174,8 @@ typedef void (*PyOS_sighandler_t)(int);
 PyAPI_FUNC(PyOS_sighandler_t) PyOS_getsig(int);
 PyAPI_FUNC(PyOS_sighandler_t) PyOS_setsig(int, PyOS_sighandler_t);
 
+/* Random */
+PyAPI_FUNC(int) _PyOS_URandom (void *buffer, Py_ssize_t size);
 
 #ifdef __cplusplus
 }

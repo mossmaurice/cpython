@@ -59,6 +59,8 @@ The :mod:`locale` module defines the following exception and functions:
    Returns the database of the local conventions as a dictionary. This dictionary
    has the following strings as keys:
 
+   .. tabularcolumns:: |l|l|L|
+
    +----------------------+-------------------------------------+--------------------------------+
    | Category             | Key                                 | Meaning                        |
    +======================+=====================================+================================+
@@ -164,22 +166,22 @@ The :mod:`locale` module defines the following exception and functions:
 
    .. data:: D_T_FMT
 
-      Get a string that can be used as a format string for :func:`strftime` to
+      Get a string that can be used as a format string for :func:`time.strftime` to
       represent date and time in a locale-specific way.
 
    .. data:: D_FMT
 
-      Get a string that can be used as a format string for :func:`strftime` to
+      Get a string that can be used as a format string for :func:`time.strftime` to
       represent a date in a locale-specific way.
 
    .. data:: T_FMT
 
-      Get a string that can be used as a format string for :func:`strftime` to
+      Get a string that can be used as a format string for :func:`time.strftime` to
       represent a time in a locale-specific way.
 
    .. data:: T_FMT_AMPM
 
-      Get a format string for :func:`strftime` to represent time in the am/pm
+      Get a format string for :func:`time.strftime` to represent time in the am/pm
       format.
 
    .. data:: DAY_1 ... DAY_7
@@ -219,7 +221,7 @@ The :mod:`locale` module defines the following exception and functions:
 
       .. note::
 
-         The expression is in the syntax suitable for the :cfunc:`regex` function
+         The expression is in the syntax suitable for the :c:func:`regex` function
          from the C library, which might differ from the syntax used in :mod:`re`.
 
    .. data:: NOEXPR
@@ -243,24 +245,24 @@ The :mod:`locale` module defines the following exception and functions:
       then-emperor's reign.
 
       Normally it should not be necessary to use this value directly. Specifying
-      the ``E`` modifier in their format strings causes the :func:`strftime`
+      the ``E`` modifier in their format strings causes the :func:`time.strftime`
       function to use this information.  The format of the returned string is not
       specified, and therefore you should not assume knowledge of it on different
       systems.
 
    .. data:: ERA_D_T_FMT
 
-      Get a format string for :func:`strftime` to represent date and time in a
+      Get a format string for :func:`time.strftime` to represent date and time in a
       locale-specific era-based way.
 
    .. data:: ERA_D_FMT
 
-      Get a format string for :func:`strftime` to represent a date in a
+      Get a format string for :func:`time.strftime` to represent a date in a
       locale-specific era-based way.
 
    .. data:: ERA_T_FMT
 
-      Get a format string for :func:`strftime` to represent a time in a
+      Get a format string for :func:`time.strftime` to represent a time in a
       locale-specific era-based way.
 
    .. data:: ALT_DIGITS
@@ -560,7 +562,7 @@ catalogs, and the C library's search algorithms for locating message catalogs.
 Python applications should normally find no need to invoke these functions, and
 should use :mod:`gettext` instead.  A known exception to this rule are
 applications that link with additional C libraries which internally invoke
-:cfunc:`gettext` or :func:`dcgettext`.  For these applications, it may be
+:c:func:`gettext` or :func:`dcgettext`.  For these applications, it may be
 necessary to bind the text domain, so that the libraries can properly locate
 their message catalogs.
 

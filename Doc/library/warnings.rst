@@ -19,7 +19,7 @@ warrant raising an exception and terminating the program.  For example, one
 might want to issue a warning when a program uses an obsolete module.
 
 Python programmers issue warnings by calling the :func:`warn` function defined
-in this module.  (C programmers use :cfunc:`PyErr_WarnEx`; see
+in this module.  (C programmers use :c:func:`PyErr_WarnEx`; see
 :ref:`exceptionhandling` for details).
 
 Warning messages are normally written to ``sys.stderr``, but their disposition
@@ -56,6 +56,8 @@ Warning Categories
 There are a number of built-in exceptions that represent warning categories.
 This categorization is useful to be able to filter out groups of warnings.  The
 following warnings category classes are currently defined:
+
+.. tabularcolumns:: |l|p{0.6\linewidth}|
 
 +----------------------------------+-----------------------------------------------+
 | Class                            | Description                                   |
@@ -167,7 +169,8 @@ By default, Python installs several warning filters, which can be overridden by
 the command-line options passed to :option:`-W` and calls to
 :func:`filterwarnings`.
 
-* :exc:`PendingDeprecationWarning`, and :exc:`ImportWarning` are ignored.
+* :exc:`DeprecationWarning` and :exc:`PendingDeprecationWarning`, and
+  :exc:`ImportWarning` are ignored.
 
 * :exc:`BytesWarning` is ignored unless the :option:`-b` option is given once or
   twice; in this case this warning is either printed (``-b``) or turned into an
@@ -418,7 +421,7 @@ Available Context Managers
 
     .. note::
 
-        In Python 3.0, the arguments to the constructor for
+        In Python 3, the arguments to the constructor for
         :class:`catch_warnings` are keyword-only arguments.
 
     .. versionadded:: 2.6

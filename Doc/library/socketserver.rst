@@ -7,8 +7,8 @@
 .. note::
 
    The :mod:`SocketServer` module has been renamed to :mod:`socketserver` in
-   Python 3.0.  The :term:`2to3` tool will automatically adapt imports when
-   converting your sources to 3.0.
+   Python 3.  The :term:`2to3` tool will automatically adapt imports when
+   converting your sources to Python 3.
 
 **Source code:** :source:`Lib/SocketServer.py`
 
@@ -116,13 +116,13 @@ can be implemented by using a synchronous server and doing an explicit fork in
 the request handler class :meth:`handle` method.
 
 Another approach to handling multiple simultaneous requests in an environment
-that supports neither threads nor :func:`fork` (or where these are too expensive
-or inappropriate for the service) is to maintain an explicit table of partially
-finished requests and to use :func:`select` to decide which request to work on
-next (or whether to handle a new incoming request).  This is particularly
-important for stream services where each client can potentially be connected for
-a long time (if threads or subprocesses cannot be used). See :mod:`asyncore` for
-another way to manage this.
+that supports neither threads nor :func:`~os.fork` (or where these are too
+expensive or inappropriate for the service) is to maintain an explicit table of
+partially finished requests and to use :func:`~select.select` to decide which
+request to work on next (or whether to handle a new incoming request).  This is
+particularly important for stream services where each client can potentially be
+connected for a long time (if threads or subprocesses cannot be used). See
+:mod:`asyncore` for another way to manage this.
 
 .. XXX should data and methods be intermingled, or separate?
    how should the distinction between class and instance variables be drawn?
@@ -158,13 +158,14 @@ Server Objects
 
 .. method:: BaseServer.serve_forever(poll_interval=0.5)
 
-   Handle requests until an explicit :meth:`shutdown` request.  Polls for
-   shutdown every *poll_interval* seconds.
+   Handle requests until an explicit :meth:`shutdown` request.
+   Poll for shutdown every *poll_interval* seconds. Ignores :attr:`self.timeout`.
+   If you need to do periodic tasks, do them in another thread.
 
 
 .. method:: BaseServer.shutdown()
 
-   Tells the :meth:`serve_forever` loop to stop and waits until it does.
+   Tell the :meth:`serve_forever` loop to stop and wait until it does.
 
    .. versionadded:: 2.6
 
@@ -305,8 +306,8 @@ request.
 .. method:: RequestHandler.finish()
 
    Called after the :meth:`handle` method to perform any clean-up actions
-   required.  The default implementation does nothing.  If :meth:`setup` or
-   :meth:`handle` raise an exception, this function will not be called.
+   required.  The default implementation does nothing.  If :meth:`setup`
+   raises an exception, this function will not be called.
 
 
 .. method:: RequestHandler.handle()
@@ -359,7 +360,7 @@ This is the server side::
            print "{} wrote:".format(self.client_address[0])
            print self.data
            # just send back the same data, but upper-cased
-           self.request.send(self.data.upper())
+           self.request.sendall(self.data.upper())
 
    if __name__ == "__main__":
        HOST, PORT = "localhost", 9999
@@ -389,7 +390,7 @@ objects that simplify communication by providing the standard file interface)::
 The difference is that the ``readline()`` call in the second handler will call
 ``recv()`` multiple times until it encounters a newline character, while the
 single ``recv()`` call in the first handler will just return what has been sent
-from the client in one ``send()`` call.
+from the client in one ``sendall()`` call.
 
 
 This is the client side::
@@ -406,7 +407,7 @@ This is the client side::
    try:
        # Connect to server and send data
        sock.connect((HOST, PORT))
-       sock.send(data + "\n")
+       sock.sendall(data + "\n")
 
        # Receive data from the server and shut down
        received = sock.recv(1024)
@@ -504,7 +505,7 @@ An example for the :class:`ThreadingMixIn` class::
            data = self.request.recv(1024)
            cur_thread = threading.current_thread()
            response = "{}: {}".format(cur_thread.name, data)
-           self.request.send(response)
+           self.request.sendall(response)
 
    class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
        pass
@@ -513,7 +514,7 @@ An example for the :class:`ThreadingMixIn` class::
        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
        sock.connect((ip, port))
        try:
-           sock.send(message)
+           sock.sendall(message)
            response = sock.recv(1024)
            print "Received: {}".format(response)
        finally:

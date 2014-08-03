@@ -1,5 +1,5 @@
-:mod:`email`: Internationalized headers
----------------------------------------
+:mod:`email.header`: Internationalized headers
+----------------------------------------------
 
 .. module:: email.header
    :synopsis: Representing non-ASCII headers
@@ -103,7 +103,7 @@ Here is the :class:`Header` class description:
       not provoke a :exc:`UnicodeError` is used.
 
       Optional *errors* is passed through to any :func:`unicode` or
-      :func:`ustr.encode` call, and defaults to "strict".
+      :meth:`unicode.encode` call, and defaults to "strict".
 
 
    .. method:: encode([splitchars])

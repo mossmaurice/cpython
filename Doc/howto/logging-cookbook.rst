@@ -97,11 +97,11 @@ The output looks like this::
 Multiple handlers and formatters
 --------------------------------
 
-Loggers are plain Python objects.  The :func:`addHandler` method has no minimum
-or maximum quota for the number of handlers you may add.  Sometimes it will be
-beneficial for an application to log all messages of all severities to a text
-file while simultaneously logging errors or above to the console.  To set this
-up, simply configure the appropriate handlers.  The logging calls in the
+Loggers are plain Python objects.  The :meth:`~Logger.addHandler` method has no
+minimum or maximum quota for the number of handlers you may add.  Sometimes it
+will be beneficial for an application to log all messages of all severities to a
+text file while simultaneously logging errors or above to the console.  To set
+this up, simply configure the appropriate handlers.  The logging calls in the
 application code will remain unchanged.  Here is a slight modification to the
 previous simple module-based configuration example::
 
@@ -295,17 +295,17 @@ the receiving end. A simple way of doing this is attaching a
    logger2.warning('Jail zesty vixen who grabbed pay from quack.')
    logger2.error('The five boxing wizards jump quickly.')
 
-At the receiving end, you can set up a receiver using the :mod:`socketserver`
+At the receiving end, you can set up a receiver using the :mod:`SocketServer`
 module. Here is a basic working example::
 
    import pickle
    import logging
    import logging.handlers
-   import socketserver
+   import SocketServer
    import struct
 
 
-   class LogRecordStreamHandler(socketserver.StreamRequestHandler):
+   class LogRecordStreamHandler(SocketServer.StreamRequestHandler):
        """Handler for a streaming logging request.
 
        This basically logs the record using whatever logging policy is
@@ -347,7 +347,7 @@ module. Here is a basic working example::
            # cycles and network bandwidth!
            logger.handle(record)
 
-   class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
+   class LogRecordSocketReceiver(SocketServer.ThreadingTCPServer):
        """
        Simple TCP socket-based logging receiver suitable for testing.
        """
@@ -357,7 +357,7 @@ module. Here is a basic working example::
        def __init__(self, host='localhost',
                     port=logging.handlers.DEFAULT_TCP_LOGGING_PORT,
                     handler=LogRecordStreamHandler):
-           socketserver.ThreadingTCPServer.__init__(self, (host, port), handler)
+           SocketServer.ThreadingTCPServer.__init__(self, (host, port), handler)
            self.abort = 0
            self.timeout = 1
            self.logname = None
@@ -395,14 +395,17 @@ printed on the console; on the server side, you should see something like::
 
 Note that there are some security issues with pickle in some scenarios. If
 these affect you, you can use an alternative serialization scheme by overriding
-the :meth:`makePickle` method and implementing your alternative there, as
-well as adapting the above script to use your alternative serialization.
+the :meth:`~handlers.SocketHandler.makePickle` method and implementing your
+alternative there, as well as adapting the above script to use your alternative
+serialization.
 
 
 .. _context-info:
 
 Adding contextual information to your logging output
 ----------------------------------------------------
+
+.. currentmodule:: logging
 
 Sometimes you want logging output to contain contextual information in
 addition to the parameters passed to the logging call. For example, in a
@@ -445,9 +448,9 @@ information in the delegated call. Here's a snippet from the code of
         msg, kwargs = self.process(msg, kwargs)
         self.logger.debug(msg, *args, **kwargs)
 
-The :meth:`process` method of :class:`LoggerAdapter` is where the contextual
-information is added to the logging output. It's passed the message and
-keyword arguments of the logging call, and it passes back (potentially)
+The :meth:`~LoggerAdapter.process` method of :class:`LoggerAdapter` is where the
+contextual information is added to the logging output. It's passed the message
+and keyword arguments of the logging call, and it passes back (potentially)
 modified versions of these to use in the call to the underlying logger. The
 default implementation of this method leaves the message alone, but inserts
 an 'extra' key in the keyword argument whose value is the dict-like object
@@ -459,70 +462,32 @@ merged into the :class:`LogRecord` instance's __dict__, allowing you to use
 customized strings with your :class:`Formatter` instances which know about
 the keys of the dict-like object. If you need a different method, e.g. if you
 want to prepend or append the contextual information to the message string,
-you just need to subclass :class:`LoggerAdapter` and override :meth:`process`
-to do what you need. Here's an example script which uses this class, which
-also illustrates what dict-like behaviour is needed from an arbitrary
-'dict-like' object for use in the constructor::
+you just need to subclass :class:`LoggerAdapter` and override
+:meth:`~LoggerAdapter.process` to do what you need. Here is a simple example::
 
-   import logging
+    class CustomAdapter(logging.LoggerAdapter):
+        """
+        This example adapter expects the passed in dict-like object to have a
+        'connid' key, whose value in brackets is prepended to the log message.
+        """
+        def process(self, msg, kwargs):
+            return '[%s] %s' % (self.extra['connid'], msg), kwargs
 
-   class ConnInfo:
-       """
-       An example class which shows how an arbitrary class can be used as
-       the 'extra' context information repository passed to a LoggerAdapter.
-       """
+which you can use like this::
 
-       def __getitem__(self, name):
-           """
-           To allow this instance to look like a dict.
-           """
-           from random import choice
-           if name == 'ip':
-               result = choice(['127.0.0.1', '192.168.0.1'])
-           elif name == 'user':
-               result = choice(['jim', 'fred', 'sheila'])
-           else:
-               result = self.__dict__.get(name, '?')
-           return result
+    logger = logging.getLogger(__name__)
+    adapter = CustomAdapter(logger, {'connid': some_conn_id})
 
-       def __iter__(self):
-           """
-           To allow iteration over keys, which will be merged into
-           the LogRecord dict before formatting and output.
-           """
-           keys = ['ip', 'user']
-           keys.extend(self.__dict__.keys())
-           return keys.__iter__()
+Then any events that you log to the adapter will have the value of
+``some_conn_id`` prepended to the log messages.
 
-   if __name__ == '__main__':
-       from random import choice
-       levels = (logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL)
-       a1 = logging.LoggerAdapter(logging.getLogger('a.b.c'),
-                                  { 'ip' : '123.231.231.123', 'user' : 'sheila' })
-       logging.basicConfig(level=logging.DEBUG,
-                           format='%(asctime)-15s %(name)-5s %(levelname)-8s IP: %(ip)-15s User: %(user)-8s %(message)s')
-       a1.debug('A debug message')
-       a1.info('An info message with %s', 'some parameters')
-       a2 = logging.LoggerAdapter(logging.getLogger('d.e.f'), ConnInfo())
-       for x in range(10):
-           lvl = choice(levels)
-           lvlname = logging.getLevelName(lvl)
-           a2.log(lvl, 'A message at %s level with %d %s', lvlname, 2, 'parameters')
+Using objects other than dicts to pass contextual information
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When this script is run, the output should look something like this::
-
-   2008-01-18 14:49:54,023 a.b.c DEBUG    IP: 123.231.231.123 User: sheila   A debug message
-   2008-01-18 14:49:54,023 a.b.c INFO     IP: 123.231.231.123 User: sheila   An info message with some parameters
-   2008-01-18 14:49:54,023 d.e.f CRITICAL IP: 192.168.0.1     User: jim      A message at CRITICAL level with 2 parameters
-   2008-01-18 14:49:54,033 d.e.f INFO     IP: 192.168.0.1     User: jim      A message at INFO level with 2 parameters
-   2008-01-18 14:49:54,033 d.e.f WARNING  IP: 192.168.0.1     User: sheila   A message at WARNING level with 2 parameters
-   2008-01-18 14:49:54,033 d.e.f ERROR    IP: 127.0.0.1       User: fred     A message at ERROR level with 2 parameters
-   2008-01-18 14:49:54,033 d.e.f ERROR    IP: 127.0.0.1       User: sheila   A message at ERROR level with 2 parameters
-   2008-01-18 14:49:54,033 d.e.f WARNING  IP: 192.168.0.1     User: sheila   A message at WARNING level with 2 parameters
-   2008-01-18 14:49:54,033 d.e.f WARNING  IP: 192.168.0.1     User: jim      A message at WARNING level with 2 parameters
-   2008-01-18 14:49:54,033 d.e.f INFO     IP: 192.168.0.1     User: fred     A message at INFO level with 2 parameters
-   2008-01-18 14:49:54,033 d.e.f WARNING  IP: 192.168.0.1     User: sheila   A message at WARNING level with 2 parameters
-   2008-01-18 14:49:54,033 d.e.f WARNING  IP: 127.0.0.1       User: jim      A message at WARNING level with 2 parameters
+You don't need to pass an actual dict to a :class:`LoggerAdapter` - you could
+pass an instance of a class which implements ``__getitem__`` and ``__iter__`` so
+that it looks like a dict to logging. This would be useful if you want to
+generate values dynamically (whereas the values in a dict would be constant).
 
 
 .. _filters-contextual:
@@ -607,24 +572,22 @@ threads in a single process *is* supported, logging to a single file from
 *multiple processes* is *not* supported, because there is no standard way to
 serialize access to a single file across multiple processes in Python. If you
 need to log to a single file from multiple processes, one way of doing this is
-to have all the processes log to a :class:`SocketHandler`, and have a separate
-process which implements a socket server which reads from the socket and logs
-to file. (If you prefer, you can dedicate one thread in one of the existing
-processes to perform this function.) :ref:`This section <network-logging>`
-documents this approach in more detail and includes a working socket receiver
-which can be used as a starting point for you to adapt in your own
-applications.
+to have all the processes log to a :class:`~handlers.SocketHandler`, and have a
+separate process which implements a socket server which reads from the socket
+and logs to file. (If you prefer, you can dedicate one thread in one of the
+existing processes to perform this function.)
+:ref:`This section <network-logging>` documents this approach in more detail and
+includes a working socket receiver which can be used as a starting point for you
+to adapt in your own applications.
 
 If you are using a recent version of Python which includes the
 :mod:`multiprocessing` module, you could write your own handler which uses the
-:class:`Lock` class from this module to serialize access to the file from
-your processes. The existing :class:`FileHandler` and subclasses do not make
-use of :mod:`multiprocessing` at present, though they may do so in the future.
-Note that at present, the :mod:`multiprocessing` module does not provide
+:class:`~multiprocessing.Lock` class from this module to serialize access to the
+file from your processes. The existing :class:`FileHandler` and subclasses do
+not make use of :mod:`multiprocessing` at present, though they may do so in the
+future. Note that at present, the :mod:`multiprocessing` module does not provide
 working lock functionality on all platforms (see
 http://bugs.python.org/issue3770).
-
-.. currentmodule:: logging.handlers
 
 
 Using file rotation
@@ -637,7 +600,7 @@ Sometimes you want to let a log file grow to a certain size, then open a new
 file and log to that. You may want to keep a certain number of these files, and
 when that many files have been created, rotate the files so that the number of
 files and the size of the files both remain bounded. For this usage pattern, the
-logging package provides a :class:`RotatingFileHandler`::
+logging package provides a :class:`~handlers.RotatingFileHandler`::
 
    import glob
    import logging
@@ -688,7 +651,7 @@ An example dictionary-based configuration
 
 Below is an example of a logging configuration dictionary - it's taken from
 the `documentation on the Django project <https://docs.djangoproject.com/en/1.3/topics/logging/#configuring-logging>`_.
-This dictionary is passed to :func:`~logging.config.dictConfig` to put the configuration into effect::
+This dictionary is passed to :func:`~config.dictConfig` to put the configuration into effect::
 
     LOGGING = {
         'version': 1,
@@ -743,5 +706,351 @@ This dictionary is passed to :func:`~logging.config.dictConfig` to put the confi
     }
 
 For more information about this configuration, you can see the `relevant
-section <https://docs.djangoproject.com/en/1.3/topics/logging/#configuring-logging>`_
+section <https://docs.djangoproject.com/en/1.6/topics/logging/#configuring-logging>`_
 of the Django documentation.
+
+Inserting a BOM into messages sent to a SysLogHandler
+-----------------------------------------------------
+
+`RFC 5424 <http://tools.ietf.org/html/rfc5424>`_ requires that a
+Unicode message be sent to a syslog daemon as a set of bytes which have the
+following structure: an optional pure-ASCII component, followed by a UTF-8 Byte
+Order Mark (BOM), followed by Unicode encoded using UTF-8. (See the `relevant
+section of the specification <http://tools.ietf.org/html/rfc5424#section-6>`_.)
+
+In Python 2.6 and 2.7, code was added to
+:class:`~logging.handlers.SysLogHandler` to insert a BOM into the message, but
+unfortunately, it was implemented incorrectly, with the BOM appearing at the
+beginning of the message and hence not allowing any pure-ASCII component to
+appear before it.
+
+As this behaviour is broken, the incorrect BOM insertion code is being removed
+from Python 2.7.4 and later. However, it is not being replaced, and if you
+want to produce RFC 5424-compliant messages which include a BOM, an optional
+pure-ASCII sequence before it and arbitrary Unicode after it, encoded using
+UTF-8, then you need to do the following:
+
+#. Attach a :class:`~logging.Formatter` instance to your
+   :class:`~logging.handlers.SysLogHandler` instance, with a format string
+   such as::
+
+      u'ASCII section\ufeffUnicode section'
+
+   The Unicode code point ``u'\ufeff'``, when encoded using UTF-8, will be
+   encoded as a UTF-8 BOM -- the byte-string ``'\xef\xbb\xbf'``.
+
+#. Replace the ASCII section with whatever placeholders you like, but make sure
+   that the data that appears in there after substitution is always ASCII (that
+   way, it will remain unchanged after UTF-8 encoding).
+
+#. Replace the Unicode section with whatever placeholders you like; if the data
+   which appears there after substitution contains characters outside the ASCII
+   range, that's fine -- it will be encoded using UTF-8.
+
+If the formatted message is Unicode, it *will* be encoded using UTF-8 encoding
+by ``SysLogHandler``. If you follow the above rules, you should be able to
+produce RFC 5424-compliant messages. If you don't, logging may not complain,
+but your messages will not be RFC 5424-compliant, and your syslog daemon may
+complain.
+
+
+Implementing structured logging
+-------------------------------
+
+Although most logging messages are intended for reading by humans, and thus not
+readily machine-parseable, there might be cirumstances where you want to output
+messages in a structured format which *is* capable of being parsed by a program
+(without needing complex regular expressions to parse the log message). This is
+straightforward to achieve using the logging package. There are a number of
+ways in which this could be achieved, but the following is a simple approach
+which uses JSON to serialise the event in a machine-parseable manner::
+
+    import json
+    import logging
+
+    class StructuredMessage(object):
+        def __init__(self, message, **kwargs):
+            self.message = message
+            self.kwargs = kwargs
+
+        def __str__(self):
+            return '%s >>> %s' % (self.message, json.dumps(self.kwargs))
+
+    _ = StructuredMessage   # optional, to improve readability
+
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
+    logging.info(_('message 1', foo='bar', bar='baz', num=123, fnum=123.456))
+
+If the above script is run, it prints::
+
+    message 1 >>> {"fnum": 123.456, "num": 123, "bar": "baz", "foo": "bar"}
+
+Note that the order of items might be different according to the version of
+Python used.
+
+If you need more specialised processing, you can use a custom JSON encoder,
+as in the following complete example::
+
+    from __future__ import unicode_literals
+
+    import json
+    import logging
+
+    # This next bit is to ensure the script runs unchanged on 2.x and 3.x
+    try:
+        unicode
+    except NameError:
+        unicode = str
+
+    class Encoder(json.JSONEncoder):
+        def default(self, o):
+            if isinstance(o, set):
+                return tuple(o)
+            elif isinstance(o, unicode):
+                return o.encode('unicode_escape').decode('ascii')
+            return super(Encoder, self).default(o)
+
+    class StructuredMessage(object):
+        def __init__(self, message, **kwargs):
+            self.message = message
+            self.kwargs = kwargs
+
+        def __str__(self):
+            s = Encoder().encode(self.kwargs)
+            return '%s >>> %s' % (self.message, s)
+
+    _ = StructuredMessage   # optional, to improve readability
+
+    def main():
+        logging.basicConfig(level=logging.INFO, format='%(message)s')
+        logging.info(_('message 1', set_value=set([1, 2, 3]), snowman='\u2603'))
+
+    if __name__ == '__main__':
+        main()
+
+When the above script is run, it prints::
+
+    message 1 >>> {"snowman": "\u2603", "set_value": [1, 2, 3]}
+
+Note that the order of items might be different according to the version of
+Python used.
+
+
+.. _custom-handlers:
+
+.. currentmodule:: logging.config
+
+Customizing handlers with :func:`dictConfig`
+--------------------------------------------
+
+There are times when you want to customize logging handlers in particular ways,
+and if you use :func:`dictConfig` you may be able to do this without
+subclassing. As an example, consider that you may want to set the ownership of a
+log file. On POSIX, this is easily done using :func:`shutil.chown`, but the file
+handlers in the stdlib don't offer built-in support. You can customize handler
+creation using a plain function such as::
+
+    def owned_file_handler(filename, mode='a', encoding=None, owner=None):
+        if owner:
+            if not os.path.exists(filename):
+                open(filename, 'a').close()
+            shutil.chown(filename, *owner)
+        return logging.FileHandler(filename, mode, encoding)
+
+You can then specify, in a logging configuration passed to :func:`dictConfig`,
+that a logging handler be created by calling this function::
+
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'default': {
+                'format': '%(asctime)s %(levelname)s %(name)s %(message)s'
+            },
+        },
+        'handlers': {
+            'file':{
+                # The values below are popped from this dictionary and
+                # used to create the handler, set the handler's level and
+                # its formatter.
+                '()': owned_file_handler,
+                'level':'DEBUG',
+                'formatter': 'default',
+                # The values below are passed to the handler creator callable
+                # as keyword arguments.
+                'owner': ['pulse', 'pulse'],
+                'filename': 'chowntest.log',
+                'mode': 'w',
+                'encoding': 'utf-8',
+            },
+        },
+        'root': {
+            'handlers': ['file'],
+            'level': 'DEBUG',
+        },
+    }
+
+In this example I am setting the ownership using the ``pulse`` user and group,
+just for the purposes of illustration. Putting it together into a working
+script, ``chowntest.py``::
+
+    import logging, logging.config, os, shutil
+
+    def owned_file_handler(filename, mode='a', encoding=None, owner=None):
+        if owner:
+            if not os.path.exists(filename):
+                open(filename, 'a').close()
+            shutil.chown(filename, *owner)
+        return logging.FileHandler(filename, mode, encoding)
+
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'default': {
+                'format': '%(asctime)s %(levelname)s %(name)s %(message)s'
+            },
+        },
+        'handlers': {
+            'file':{
+                # The values below are popped from this dictionary and
+                # used to create the handler, set the handler's level and
+                # its formatter.
+                '()': owned_file_handler,
+                'level':'DEBUG',
+                'formatter': 'default',
+                # The values below are passed to the handler creator callable
+                # as keyword arguments.
+                'owner': ['pulse', 'pulse'],
+                'filename': 'chowntest.log',
+                'mode': 'w',
+                'encoding': 'utf-8',
+            },
+        },
+        'root': {
+            'handlers': ['file'],
+            'level': 'DEBUG',
+        },
+    }
+
+    logging.config.dictConfig(LOGGING)
+    logger = logging.getLogger('mylogger')
+    logger.debug('A debug message')
+
+To run this, you will probably need to run as ``root``::
+
+    $ sudo python3.3 chowntest.py
+    $ cat chowntest.log
+    2013-11-05 09:34:51,128 DEBUG mylogger A debug message
+    $ ls -l chowntest.log
+    -rw-r--r-- 1 pulse pulse 55 2013-11-05 09:34 chowntest.log
+
+Note that this example uses Python 3.3 because that's where :func:`shutil.chown`
+makes an appearance. This approach should work with any Python version that
+supports :func:`dictConfig` - namely, Python 2.7, 3.2 or later. With pre-3.3
+versions, you would need to implement the actual ownership change using e.g.
+:func:`os.chown`.
+
+In practice, the handler-creating function may be in a utility module somewhere
+in your project. Instead of the line in the configuration::
+
+    '()': owned_file_handler,
+
+you could use e.g.::
+
+    '()': 'ext://project.util.owned_file_handler',
+
+where ``project.util`` can be replaced with the actual name of the package
+where the function resides. In the above working script, using
+``'ext://__main__.owned_file_handler'`` should work. Here, the actual callable
+is resolved by :func:`dictConfig` from the ``ext://`` specification.
+
+This example hopefully also points the way to how you could implement other
+types of file change - e.g. setting specific POSIX permission bits - in the
+same way, using :func:`os.chmod`.
+
+Of course, the approach could also be extended to types of handler other than a
+:class:`~logging.FileHandler` - for example, one of the rotating file handlers,
+or a different type of handler altogether.
+
+
+.. _filters-dictconfig:
+
+Configuring filters with :func:`dictConfig`
+-------------------------------------------
+
+You *can* configure filters using :func:`~logging.config.dictConfig`, though it
+might not be obvious at first glance how to do it (hence this recipe). Since
+:class:`~logging.Filter` is the only filter class included in the standard
+library, and it is unlikely to cater to many requirements (it's only there as a
+base class), you will typically need to define your own :class:`~logging.Filter`
+subclass with an overridden :meth:`~logging.Filter.filter` method. To do this,
+specify the ``()`` key in the configuration dictionary for the filter,
+specifying a callable which will be used to create the filter (a class is the
+most obvious, but you can provide any callable which returns a
+:class:`~logging.Filter` instance). Here is a complete example::
+
+    import logging
+    import logging.config
+    import sys
+
+    class MyFilter(logging.Filter):
+        def __init__(self, param=None):
+            self.param = param
+
+        def filter(self, record):
+            if self.param is None:
+                allow = True
+            else:
+                allow = self.param not in record.msg
+            if allow:
+                record.msg = 'changed: ' + record.msg
+            return allow
+
+    LOGGING = {
+        'version': 1,
+        'filters': {
+            'myfilter': {
+                '()': MyFilter,
+                'param': 'noshow',
+            }
+        },
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'filters': ['myfilter']
+            }
+        },
+        'root': {
+            'level': 'DEBUG',
+            'handlers': ['console']
+        },
+    }
+
+    if __name__ == '__main__':
+        logging.config.dictConfig(LOGGING)
+        logging.debug('hello')
+        logging.debug('hello - noshow')
+
+This example shows how you can pass configuration data to the callable which
+constructs the instance, in the form of keyword parameters. When run, the above
+script will print::
+
+    changed: hello
+
+which shows that the filter is working as configured.
+
+A couple of extra points to note:
+
+* If you can't refer to the callable directly in the configuration (e.g. if it
+  lives in a different module, and you can't import it directly where the
+  configuration dictionary is), you can use the form ``ext://...`` as described
+  in :ref:`logging-config-dict-externalobj`. For example, you could have used
+  the text ``'ext://__main__.MyFilter'`` instead of ``MyFilter`` in the above
+  example.
+
+* As well as for filters, this technique can also be used to configure custom
+  handlers and formatters. See :ref:`logging-config-dict-userdef` for more
+  information on how logging supports using user-defined objects in its
+  configuration, and see the other cookbook recipe :ref:`custom-handlers` above.
+

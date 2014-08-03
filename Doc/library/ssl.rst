@@ -30,6 +30,18 @@ probably additional platforms, as long as OpenSSL is installed on that platform.
    operating system socket APIs.  The installed version of OpenSSL may also
    cause variations in behavior.
 
+.. warning::
+   The ssl module won't validate certificates by default.  When used in
+   client mode, this means you are vulnerable to man-in-the-middle attacks.
+
+.. warning::
+
+   OpenSSL's internal random number generator does not properly handle fork.
+   Applications must change the PRNG state of the parent process if they use
+   any SSL feature with :func:`os.fork`. Any successful call of
+   :func:`~ssl.RAND_add`, :func:`~ssl.RAND_bytes` or
+   :func:`~ssl.RAND_pseudo_bytes` is sufficient.
+
 This section documents the objects and functions in the ``ssl`` module; for more
 general information about TLS, SSL, and certificates, the reader is referred to
 the documents in the "See Also" section at the bottom.
@@ -57,13 +69,16 @@ Functions, Constants, and Exceptions
 
    Takes an instance ``sock`` of :class:`socket.socket`, and returns an instance
    of :class:`ssl.SSLSocket`, a subtype of :class:`socket.socket`, which wraps
-   the underlying socket in an SSL context.  For client-side sockets, the
-   context construction is lazy; if the underlying socket isn't connected yet,
-   the context construction will be performed after :meth:`connect` is called on
-   the socket.  For server-side sockets, if the socket has no remote peer, it is
-   assumed to be a listening socket, and the server-side SSL wrapping is
-   automatically performed on client connections accepted via the :meth:`accept`
-   method.  :func:`wrap_socket` may raise :exc:`SSLError`.
+   the underlying socket in an SSL context.  ``sock`` must be a
+   :data:`~socket.SOCK_STREAM` socket; other socket types are unsupported.
+
+   For client-side sockets, the context construction is lazy; if the
+   underlying socket isn't connected yet, the context construction will be
+   performed after :meth:`connect` is called on the socket.  For
+   server-side sockets, if the socket has no remote peer, it is assumed
+   to be a listening socket, and the server-side SSL wrapping is
+   automatically performed on client connections accepted via the
+   :meth:`accept` method.  :func:`wrap_socket` may raise :exc:`SSLError`.
 
    The ``keyfile`` and ``certfile`` parameters specify optional files which
    contain a certificate to be used to identify the local side of the
@@ -103,9 +118,8 @@ Functions, Constants, and Exceptions
    The parameter ``ssl_version`` specifies which version of the SSL protocol to
    use.  Typically, the server chooses a particular protocol version, and the
    client must adapt to the server's choice.  Most of the versions are not
-   interoperable with the other versions.  If not specified, for client-side
-   operation, the default SSL version is SSLv3; for server-side operation,
-   SSLv23.  These version selections provide the most compatibility with other
+   interoperable with the other versions.  If not specified, the default is
+   :data:`PROTOCOL_SSLv23`; it provides the most compatibility with other
    versions.
 
    Here's a table showing which versions in a client (down the side) can connect
@@ -117,7 +131,7 @@ Functions, Constants, and Exceptions
         *client* / **server**    **SSLv2**  **SSLv3**  **SSLv23**  **TLSv1**
        ------------------------  ---------  ---------  ----------  ---------
         *SSLv2*                    yes        no         yes         no
-        *SSLv3*                    yes        yes        yes         no
+        *SSLv3*                    no         yes        yes         no
         *SSLv23*                   yes        no         yes         no
         *TLSv1*                    no         no         yes         yes
        ========================  =========  =========  ==========  =========
@@ -155,7 +169,7 @@ Functions, Constants, and Exceptions
 
 .. function:: RAND_status()
 
-   Returns True if the SSL pseudo-random number generator has been seeded with
+   Returns ``True`` if the SSL pseudo-random number generator has been seeded with
    'enough' randomness, and False otherwise.  You can use :func:`ssl.RAND_egd`
    and :func:`ssl.RAND_add` to increase the randomness of the pseudo-random
    number generator.
@@ -299,21 +313,37 @@ Functions, Constants, and Exceptions
 SSLSocket Objects
 -----------------
 
-.. method:: SSLSocket.read([nbytes=1024])
+SSL sockets provide the following methods of :ref:`socket-objects`:
 
-   Reads up to ``nbytes`` bytes from the SSL-encrypted channel and returns them.
+- :meth:`~socket.socket.accept()`
+- :meth:`~socket.socket.bind()`
+- :meth:`~socket.socket.close()`
+- :meth:`~socket.socket.connect()`
+- :meth:`~socket.socket.fileno()`
+- :meth:`~socket.socket.getpeername()`, :meth:`~socket.socket.getsockname()`
+- :meth:`~socket.socket.getsockopt()`, :meth:`~socket.socket.setsockopt()`
+- :meth:`~socket.socket.gettimeout()`, :meth:`~socket.socket.settimeout()`,
+  :meth:`~socket.socket.setblocking()`
+- :meth:`~socket.socket.listen()`
+- :meth:`~socket.socket.makefile()`
+- :meth:`~socket.socket.recv()`, :meth:`~socket.socket.recv_into()`
+  (but passing a non-zero ``flags`` argument is not allowed)
+- :meth:`~socket.socket.send()`, :meth:`~socket.socket.sendall()` (with
+  the same limitation)
+- :meth:`~socket.socket.shutdown()`
 
-.. method:: SSLSocket.write(data)
+However, since the SSL (and TLS) protocol has its own framing atop
+of TCP, the SSL sockets abstraction can, in certain respects, diverge from
+the specification of normal, OS-level sockets.
 
-   Writes the ``data`` to the other side of the connection, using the SSL
-   channel to encrypt.  Returns the number of bytes written.
+SSL sockets also have the following additional methods and attributes:
 
 .. method:: SSLSocket.getpeercert(binary_form=False)
 
    If there is no certificate for the peer on the other end of the connection,
    returns ``None``.
 
-   If the parameter ``binary_form`` is :const:`False`, and a certificate was
+   If the ``binary_form`` parameter is :const:`False`, and a certificate was
    received from the peer, this method returns a :class:`dict` instance.  If the
    certificate was not validated, the dict is empty.  If the certificate was
    validated, it returns a dict with the keys ``subject`` (the principal for
@@ -339,10 +369,16 @@ SSLSocket Objects
    If the ``binary_form`` parameter is :const:`True`, and a certificate was
    provided, this method returns the DER-encoded form of the entire certificate
    as a sequence of bytes, or :const:`None` if the peer did not provide a
-   certificate.  This return value is independent of validation; if validation
-   was required (:const:`CERT_OPTIONAL` or :const:`CERT_REQUIRED`), it will have
-   been validated, but if :const:`CERT_NONE` was used to establish the
-   connection, the certificate, if present, will not have been validated.
+   certificate.  Whether the peer provides a certificate depends on the SSL
+   socket's role:
+
+   * for a client SSL socket, the server will always provide a certificate,
+     regardless of whether validation was required;
+
+   * for a server SSL socket, the client will only provide a certificate
+     when requested by the server; therefore :meth:`getpeercert` will return
+     :const:`None` if you used :const:`CERT_NONE` (rather than
+     :const:`CERT_OPTIONAL` or :const:`CERT_REQUIRED`).
 
 .. method:: SSLSocket.cipher()
 
@@ -362,7 +398,7 @@ SSLSocket Objects
             try:
                 s.do_handshake()
                 break
-            except ssl.SSLError, err:
+            except ssl.SSLError as err:
                 if err.args[0] == ssl.SSL_ERROR_WANT_READ:
                     select.select([s], [], [])
                 elif err.args[0] == ssl.SSL_ERROR_WANT_WRITE:
@@ -454,8 +490,7 @@ these chains concatenated together.  For validation, Python will use the first
 chain it finds in the file which matches.
 
 Some "standard" root certificates are available from various certification
-authorities: `CACert.org <http://www.cacert.org/index.php?id=3>`_, `Thawte
-<http://www.thawte.com/roots/>`_, `Verisign
+authorities: `Thawte <http://www.thawte.com/roots/>`_, `Verisign
 <http://www.verisign.com/support/roots.html>`_, `Positive SSL
 <http://www.PositiveSSL.com/ssl-certificate-support/cert_installation/UTN-USERFirst-Hardware.crt>`_
 (used by python.org), `Equifax and GeoTrust
@@ -620,10 +655,10 @@ And go back to listening for new client connections.
 .. seealso::
 
    Class :class:`socket.socket`
-            Documentation of underlying :mod:`socket` class
+       Documentation of underlying :mod:`socket` class
 
-   `TLS (Transport Layer Security) and SSL (Secure Socket Layer) <http://www3.rad.com/networks/applications/secure/tls.htm>`_
-      Debby Koren
+   `SSL/TLS Strong Encryption: An Introduction <http://httpd.apache.org/docs/trunk/en/ssl/ssl_intro.html>`_
+       Intro from the Apache webserver documentation
 
    `RFC 1422: Privacy Enhancement for Internet Electronic Mail: Part II: Certificate-Based Key Management <http://www.ietf.org/rfc/rfc1422>`_
        Steve Kent

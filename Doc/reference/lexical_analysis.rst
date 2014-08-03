@@ -104,9 +104,7 @@ are ignored by the syntax; they are not tokens.
 Encoding declarations
 ---------------------
 
-.. index::
-   single: source character set
-   single: encodings
+.. index:: source character set, encoding declarations (source file)
 
 If a comment in the first or second line of the Python script matches the
 regular expression ``coding[=:]\s*([-\w.]+)``, this comment is processed as an
@@ -357,11 +355,11 @@ exactly as written here:
    assign a different object to it.
 
 .. versionchanged:: 2.5
-   Both :keyword:`as` and :keyword:`with` are only recognized when the
-   ``with_statement`` future feature has been enabled. It will always be enabled in
-   Python 2.6.  See section :ref:`with` for details.  Note that using :keyword:`as`
-   and :keyword:`with` as identifiers will always issue a warning, even when the
-   ``with_statement`` future directive is not in effect.
+   Using :keyword:`as` and :keyword:`with` as identifiers triggers a warning.  To
+   use them as keywords, enable the ``with_statement`` future feature .
+
+.. versionchanged:: 2.6
+    :keyword:`as` and :keyword:`with` are full keywords.
 
 
 .. _id-classes:
@@ -529,8 +527,7 @@ Notes:
 (2)
    Any Unicode character can be encoded this way, but characters outside the Basic
    Multilingual Plane (BMP) will be encoded using a surrogate pair if Python is
-   compiled to use 16-bit code units (the default).  Individual code units which
-   form parts of a surrogate pair can be encoded using this escape sequence.
+   compiled to use 16-bit code units (the default).
 
 (3)
    As in Standard C, up to three octal digits are accepted.

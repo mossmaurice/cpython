@@ -24,7 +24,7 @@ Command line
 
 When invoking Python, you may specify any of these options::
 
-    python [-BdEiOQsStuUvVWxX3?] [-c command | -m module-name | script | - ] [args]
+    python [-BdEiOQsRStuUvVWxX3?] [-c command | -m module-name | script | - ] [args]
 
 The most common use case is, of course, a simple invocation of a script::
 
@@ -253,6 +253,29 @@ Miscellaneous options
       :pep:`238` -- Changing the division operator
 
 
+.. cmdoption:: -R
+
+   Turn on hash randomization, so that the :meth:`__hash__` values of str,
+   bytes and datetime objects are "salted" with an unpredictable random value.
+   Although they remain constant within an individual Python process, they are
+   not predictable between repeated invocations of Python.
+
+   This is intended to provide protection against a denial-of-service caused by
+   carefully-chosen inputs that exploit the worst case performance of a dict
+   construction, O(n^2) complexity.  See
+   http://www.ocert.org/advisories/ocert-2011-003.html for details.
+
+   Changing hash values affects the order in which keys are retrieved from a
+   dict.  Although Python has never made guarantees about this ordering (and it
+   typically varies between 32-bit and 64-bit builds), enough real-world code
+   implicitly relies on this non-guaranteed behavior that the randomization is
+   disabled by default.
+
+   See also :envvar:`PYTHONHASHSEED`.
+
+   .. versionadded:: 2.6.8
+
+
 .. cmdoption:: -s
 
    Don't add the :data:`user site-packages directory <site.USER_SITE>` to
@@ -374,18 +397,9 @@ Miscellaneous options
 
 .. cmdoption:: -3
 
-   Warn about Python 3.x incompatibilities which cannot be fixed trivially by
-   :ref:`2to3 <2to3-reference>`. Among these are:
-
-   * :meth:`dict.has_key`
-   * :func:`apply`
-   * :func:`callable`
-   * :func:`coerce`
-   * :func:`execfile`
-   * :func:`reduce`
-   * :func:`reload`
-
-   Using these will emit a :exc:`DeprecationWarning`.
+   Warn about Python 3.x possible incompatibilities by emitting a
+   :exc:`DeprecationWarning` for features that are removed or significantly
+   changed in Python 3.
 
    .. versionadded:: 2.6
 
@@ -419,7 +433,10 @@ Options you shouldn't use
 Environment variables
 ---------------------
 
-These environment variables influence Python's behavior.
+These environment variables influence Python's behavior, they are processed
+before the command-line switches other than -E.  It is customary that
+command-line switches override environmental variables where there is a
+conflict.
 
 .. envvar:: PYTHONHOME
 
@@ -512,15 +529,37 @@ These environment variables influence Python's behavior.
 .. envvar:: PYTHONCASEOK
 
    If this is set, Python ignores case in :keyword:`import` statements.  This
-   only works on Windows.
+   only works on Windows, OS X, OS/2, and RiscOS.
 
 
 .. envvar:: PYTHONDONTWRITEBYTECODE
 
    If this is set, Python won't try to write ``.pyc`` or ``.pyo`` files on the
-   import of source modules.
+   import of source modules.  This is equivalent to specifying the :option:`-B`
+   option.
 
    .. versionadded:: 2.6
+
+.. envvar:: PYTHONHASHSEED
+
+   If this variable is set to ``random``, the effect is the same as specifying
+   the :option:`-R` option: a random value is used to seed the hashes of str,
+   bytes and datetime objects.
+
+   If :envvar:`PYTHONHASHSEED` is set to an integer value, it is used as a
+   fixed seed for generating the hash() of the types covered by the hash
+   randomization.
+
+   Its purpose is to allow repeatable hashing, such as for selftests for the
+   interpreter itself, or to allow a cluster of python processes to share hash
+   values.
+
+   The integer must be a decimal number in the range [0,4294967295].
+   Specifying the value 0 will lead to the same hash values as when hash
+   randomization is disabled.
+
+   .. versionadded:: 2.6.8
+
 
 .. envvar:: PYTHONIOENCODING
 
@@ -593,4 +632,3 @@ if Python was configured with the ``--with-pydebug`` build option.
 
    If set, Python will print memory allocation statistics every time a new
    object arena is created, and on shutdown.
-

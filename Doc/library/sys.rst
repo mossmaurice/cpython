@@ -1,4 +1,3 @@
-
 :mod:`sys` --- System-specific parameters and functions
 =======================================================
 
@@ -208,15 +207,17 @@ always available.
    be set at build time with the ``--exec-prefix`` argument to the
    :program:`configure` script.  Specifically, all configuration files (e.g. the
    :file:`pyconfig.h` header file) are installed in the directory
-   :file:`{exec_prefix}/lib/python{X.Y}/config', and shared library modules are
+   :file:`{exec_prefix}/lib/python{X.Y}/config`, and shared library modules are
    installed in :file:`{exec_prefix}/lib/python{X.Y}/lib-dynload`, where *X.Y*
    is the version number of Python, for example ``2.7``.
 
 
 .. data:: executable
 
-   A string giving the name of the executable binary for the Python interpreter, on
-   systems where this makes sense.
+   A string giving the absolute path of the executable binary for the Python
+   interpreter, on systems where this makes sense. If Python is unable to retrieve
+   the real path to its executable, :data:`sys.executable` will be an empty string
+   or ``None``.
 
 
 .. function:: exit([arg])
@@ -284,10 +285,13 @@ always available.
    :const:`verbose`              :option:`-v`
    :const:`unicode`              :option:`-U`
    :const:`bytes_warning`        :option:`-b`
+   :const:`hash_randomization`   :option:`-R`
    ============================= ===================================
 
    .. versionadded:: 2.6
 
+   .. versionadded:: 2.7.3
+      The ``hash_randomization`` attribute.
 
 .. data:: float_info
 
@@ -297,6 +301,8 @@ always available.
    header file :file:`float.h` for the 'C' programming language; see section
    5.2.4.2.2 of the 1999 ISO/IEC C standard [C99]_, 'Characteristics of
    floating types', for details.
+
+   .. tabularcolumns:: |l|l|L|
 
    +---------------------+----------------+--------------------------------------------------+
    | attribute           | float.h macro  | explanation                                      |
@@ -388,7 +394,7 @@ always available.
 
 .. function:: getdlopenflags()
 
-   Return the current value of the flags that are used for :cfunc:`dlopen` calls.
+   Return the current value of the flags that are used for :c:func:`dlopen` calls.
    The flag constants are defined in the :mod:`dl` and :mod:`DLFCN` modules.
    Availability: Unix.
 
@@ -533,8 +539,8 @@ always available.
    +---------------------------------------+---------------------------------+
 
 
-   This function wraps the Win32 :cfunc:`GetVersionEx` function; see the
-   Microsoft documentation on :cfunc:`OSVERSIONINFOEX` for more information
+   This function wraps the Win32 :c:func:`GetVersionEx` function; see the
+   Microsoft documentation on :c:func:`OSVERSIONINFOEX` for more information
    about these fields.
 
    Availability: Windows.
@@ -595,6 +601,8 @@ always available.
    A struct sequence that holds information about Python's
    internal representation of integers.  The attributes are read only.
 
+   .. tabularcolumns:: |l|L|
+
    +-------------------------+----------------------------------------------+
    | Attribute               | Explanation                                  |
    +=========================+==============================================+
@@ -653,7 +661,7 @@ always available.
     imported. The :meth:`find_module` method is called at least with the
     absolute name of the module being imported. If the module to be imported is
     contained in package then the parent package's :attr:`__path__` attribute
-    is passed in as a second argument. The method returns :keyword:`None` if
+    is passed in as a second argument. The method returns ``None`` if
     the module cannot be found, else returns a :term:`loader`.
 
     :data:`sys.meta_path` is searched before any implicit default finders or
@@ -712,7 +720,7 @@ always available.
     A dictionary acting as a cache for :term:`finder` objects. The keys are
     paths that have been passed to :data:`sys.path_hooks` and the values are
     the finders that are found. If a path is a valid file system path but no
-    explicit finder is found on :data:`sys.path_hooks` then :keyword:`None` is
+    explicit finder is found on :data:`sys.path_hooks` then ``None`` is
     stored to represent the implicit default finder should be used. If the path
     is not an existing path then :class:`imp.NullImporter` is set.
 
@@ -770,9 +778,9 @@ always available.
    independent Python files are installed; by default, this is the string
    ``'/usr/local'``.  This can be set at build time with the ``--prefix``
    argument to the :program:`configure` script.  The main collection of Python
-   library modules is installed in the directory :file:`{prefix}/lib/python{X.Y}``
+   library modules is installed in the directory :file:`{prefix}/lib/python{X.Y}`
    while the platform independent header files (all except :file:`pyconfig.h`) are
-   stored in :file:`{prefix}/include/python{X.Y}``, where *X.Y* is the version
+   stored in :file:`{prefix}/include/python{X.Y}`, where *X.Y* is the version
    number of Python, for example ``2.7``.
 
 
@@ -793,10 +801,10 @@ always available.
 
 .. data:: py3kwarning
 
-   Bool containing the status of the Python 3.0 warning flag. It's ``True``
+   Bool containing the status of the Python 3 warning flag. It's ``True``
    when Python is started with the -3 option.  (This should be considered
    read-only; setting it to a different value doesn't have an effect on
-   Python 3.0 warnings.)
+   Python 3 warnings.)
 
    .. versionadded:: 2.6
 
@@ -827,7 +835,7 @@ always available.
 
 .. function:: setdlopenflags(n)
 
-   Set the flags used by the interpreter for :cfunc:`dlopen` calls, such as when
+   Set the flags used by the interpreter for :c:func:`dlopen` calls, such as when
    the interpreter loads extension modules.  Among other things, this will enable a
    lazy resolving of symbols when importing a module, if called as
    ``sys.setdlopenflags(0)``.  To share symbols across extension modules, call as
@@ -1069,5 +1077,5 @@ always available.
 
 .. rubric:: Citations
 
-.. [C99] ISO/IEC 9899:1999.  "Programming languages -- C."  A public draft of this standard is available at http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf .
+.. [C99] ISO/IEC 9899:1999.  "Programming languages -- C."  A public draft of this standard is available at http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf\ .
 

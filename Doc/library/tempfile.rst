@@ -86,13 +86,14 @@ The module defines the following user-callable functions:
    data is spooled in memory until the file size exceeds *max_size*, or
    until the file's :func:`fileno` method is called, at which point the
    contents are written to disk and operation proceeds as with
-   :func:`TemporaryFile`.
+   :func:`TemporaryFile`.  Also, it's ``truncate`` method does not
+   accept a ``size`` argument.
 
    The resulting file has one additional method, :func:`rollover`, which
    causes the file to roll over to an on-disk file regardless of its size.
 
    The returned object is a file-like object whose :attr:`_file` attribute
-   is either a :class:`StringIO` object or a true file object, depending on
+   is either a :class:`~StringIO.StringIO` object or a true file object, depending on
    whether :func:`rollover` has been called. This file-like object can be
    used in a :keyword:`with` statement, just like a normal file.
 

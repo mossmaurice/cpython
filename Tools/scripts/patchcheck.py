@@ -36,6 +36,20 @@ def status(message, modal=False, info=None):
     return decorated_fxn
 
 
+def mq_patches_applied():
+    """Check if there are any applied MQ patches."""
+    cmd = 'hg qapplied'
+    st = subprocess.Popen(cmd.split(),
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE)
+    try:
+        bstdout, _ = st.communicate()
+        return st.returncode == 0 and bstdout
+    finally:
+        st.stdout.close()
+        st.stderr.close()
+
+
 @status("Getting the list of files that have been added/changed",
         info=lambda x: n_files_str(len(x)))
 def changed_files():
@@ -43,6 +57,8 @@ def changed_files():
     if os.path.isdir(os.path.join(SRCDIR, '.hg')):
         vcs = 'hg'
         cmd = 'hg status --added --modified --no-status'
+        if mq_patches_applied():
+            cmd += ' --rev qparent'
     elif os.path.isdir('.svn'):
         vcs = 'svn'
         cmd = 'svn status --quiet --non-interactive --ignore-externals'
@@ -128,13 +144,13 @@ def docs_modified(file_paths):
 @status("Misc/ACKS updated", modal=True)
 def credit_given(file_paths):
     """Check if Misc/ACKS has been changed."""
-    return 'Misc/ACKS' in file_paths
+    return os.path.join('Misc', 'ACKS') in file_paths
 
 
 @status("Misc/NEWS updated", modal=True)
 def reported_news(file_paths):
     """Check if Misc/NEWS has been changed."""
-    return 'Misc/NEWS' in file_paths
+    return os.path.join('Misc', 'NEWS') in file_paths
 
 
 def main():
@@ -142,7 +158,8 @@ def main():
     python_files = [fn for fn in file_paths if fn.endswith('.py')]
     c_files = [fn for fn in file_paths if fn.endswith(('.c', '.h'))]
     doc_files = [fn for fn in file_paths if fn.startswith('Doc')]
-    special_files = {'Misc/ACKS', 'Misc/NEWS'} & set(file_paths)
+    misc_files = {os.path.join('Misc', 'ACKS'), os.path.join('Misc', 'NEWS')}\
+            & set(file_paths)
     # PEP 8 whitespace rules enforcement.
     normalize_whitespace(python_files)
     # C rules enforcement.
@@ -152,14 +169,15 @@ def main():
     # Docs updated.
     docs_modified(doc_files)
     # Misc/ACKS changed.
-    credit_given(special_files)
+    credit_given(misc_files)
     # Misc/NEWS changed.
-    reported_news(special_files)
+    reported_news(misc_files)
 
     # Test suite run and passed.
     if python_files or c_files:
+        end = " and check for refleaks?" if c_files else "?"
         print
-        print "Did you run the test suite?"
+        print "Did you run the test suite" + end
 
 
 if __name__ == '__main__':

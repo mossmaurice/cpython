@@ -306,7 +306,8 @@ BaseException_set_args(PyBaseExceptionObject *self, PyObject *val)
         return -1;
     }
     seq = PySequence_Tuple(val);
-    if (!seq) return -1;
+    if (!seq)
+        return -1;
     Py_CLEAR(self->args);
     self->args = seq;
     return 0;
@@ -348,8 +349,7 @@ BaseException_set_message(PyBaseExceptionObject *self, PyObject *val)
             if (PyDict_DelItemString(self->dict, "message") < 0)
                 return -1;
         }
-        Py_XDECREF(self->message);
-        self->message = NULL;
+        Py_CLEAR(self->message);
         return 0;
     }
 
@@ -773,7 +773,8 @@ EnvironmentError_reduce(PyEnvironmentErrorObject *self)
      * file name given to EnvironmentError. */
     if (PyTuple_GET_SIZE(args) == 2 && self->filename) {
         args = PyTuple_New(3);
-        if (!args) return NULL;
+        if (!args)
+            return NULL;
 
         tmp = PyTuple_GET_ITEM(self->args, 0);
         Py_INCREF(tmp);
@@ -1071,7 +1072,8 @@ SyntaxError_init(PySyntaxErrorObject *self, PyObject *args, PyObject *kwds)
     if (lenargs == 2) {
         info = PyTuple_GET_ITEM(args, 1);
         info = PySequence_Tuple(info);
-        if (!info) return -1;
+        if (!info)
+            return -1;
 
         if (PyTuple_GET_SIZE(info) != 4) {
             /* not a very good error message, but it's what Python 2.4 gives */
@@ -1167,9 +1169,11 @@ SyntaxError_str(PySyntaxErrorObject *self)
         str = PyObject_Str(self->msg);
     else
         str = PyObject_Str(Py_None);
-    if (!str) return NULL;
+    if (!str)
+        return NULL;
     /* Don't fiddle with non-string return (shouldn't happen anyway) */
-    if (!PyString_Check(str)) return str;
+    if (!PyString_Check(str))
+        return str;
 
     /* XXX -- do all the additional formatting with filename and
        lineno here */
@@ -1644,6 +1648,10 @@ UnicodeEncodeError_str(PyObject *self)
     PyObject *reason_str = NULL;
     PyObject *encoding_str = NULL;
 
+    if (!uself->object)
+        /* Not properly initialized. */
+        return PyUnicode_FromString("");
+
     /* Get reason and encoding as strings, which they might not be if
        they've been modified after we were contructed. */
     reason_str = PyObject_Str(uself->reason);
@@ -1728,6 +1736,10 @@ UnicodeDecodeError_str(PyObject *self)
     PyObject *result = NULL;
     PyObject *reason_str = NULL;
     PyObject *encoding_str = NULL;
+
+    if (!uself->object)
+        /* Not properly initialized. */
+        return PyUnicode_FromString("");
 
     /* Get reason and encoding as strings, which they might not be if
        they've been modified after we were contructed. */
@@ -1825,6 +1837,10 @@ UnicodeTranslateError_str(PyObject *self)
     PyUnicodeErrorObject *uself = (PyUnicodeErrorObject *)self;
     PyObject *result = NULL;
     PyObject *reason_str = NULL;
+
+    if (!uself->object)
+        /* Not properly initialized. */
+        return PyUnicode_FromString("");
 
     /* Get reason as a string, which it might not be if it's been
        modified after we were contructed. */
@@ -2111,7 +2127,8 @@ _PyExc_Init(void)
 
     m = Py_InitModule4("exceptions", functions, exceptions_doc,
         (PyObject *)NULL, PYTHON_API_VERSION);
-    if (m == NULL) return;
+    if (m == NULL)
+        return;
 
     bltinmod = PyImport_ImportModule("__builtin__");
     if (bltinmod == NULL)
@@ -2203,7 +2220,6 @@ _PyExc_Init(void)
             Py_FatalError("init of pre-allocated RuntimeError failed");
         Py_DECREF(args_tuple);
     }
-
     Py_DECREF(bltinmod);
 }
 

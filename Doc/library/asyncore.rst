@@ -25,7 +25,7 @@ bound.  If your program is processor bound, then pre-emptive scheduled threads
 are probably what you really need.  Network servers are rarely processor
 bound, however.
 
-If your operating system supports the :cfunc:`select` system call in its I/O
+If your operating system supports the :c:func:`select` system call in its I/O
 library (and nearly all do), then you can use it to juggle multiple
 communication channels at once; doing other work while your I/O is taking
 place in the "background."  Although this strategy can seem strange and
@@ -53,10 +53,10 @@ any that have been added to the map during asynchronous service) is closed.
    channels have been closed.  All arguments are optional.  The *count*
    parameter defaults to None, resulting in the loop terminating only when all
    channels have been closed.  The *timeout* argument sets the timeout
-   parameter for the appropriate :func:`select` or :func:`poll` call, measured
-   in seconds; the default is 30 seconds.  The *use_poll* parameter, if true,
-   indicates that :func:`poll` should be used in preference to :func:`select`
-   (the default is ``False``).
+   parameter for the appropriate :func:`~select.select` or :func:`~select.poll`
+   call, measured in seconds; the default is 30 seconds.  The *use_poll*
+   parameter, if true, indicates that :func:`~select.poll` should be used in
+   preference to :func:`~select.select` (the default is ``False``).
 
    The *map* parameter is a dictionary whose items are the channels to watch.
    As channels are closed they are deleted from their map.  If *map* is
@@ -95,8 +95,8 @@ any that have been added to the map during asynchronous service) is closed.
 
    During asynchronous processing, each mapped channel's :meth:`readable` and
    :meth:`writable` methods are used to determine whether the channel's socket
-   should be added to the list of channels :cfunc:`select`\ ed or
-   :cfunc:`poll`\ ed for read and write events.
+   should be added to the list of channels :c:func:`select`\ ed or
+   :c:func:`poll`\ ed for read and write events.
 
    Thus, the set of channel events is larger than the basic socket events.  The
    full set of methods that can be overridden in your subclass follows:
@@ -193,6 +193,11 @@ any that have been added to the map during asynchronous service) is closed.
       Read at most *buffer_size* bytes from the socket's remote end-point.  An
       empty string implies that the channel has been closed from the other end.
 
+      Note that :meth:`recv` may raise :exc:`socket.error` with
+      :data:`~errno.EAGAIN` or :data:`~errno.EWOULDBLOCK`, even though
+      :func:`select.select` or :func:`select.poll` has reported the socket
+      ready for reading.
+
 
    .. method:: listen(backlog)
 
@@ -238,9 +243,9 @@ any that have been added to the map during asynchronous service) is closed.
 .. class:: file_dispatcher()
 
    A file_dispatcher takes a file descriptor or file object along with an
-   optional map argument and wraps it for use with the :cfunc:`poll` or
-   :cfunc:`loop` functions.  If provided a file object or anything with a
-   :cfunc:`fileno` method, that method will be called and passed to the
+   optional map argument and wraps it for use with the :c:func:`poll` or
+   :c:func:`loop` functions.  If provided a file object or anything with a
+   :c:func:`fileno` method, that method will be called and passed to the
    :class:`file_wrapper` constructor.  Availability: UNIX.
 
 .. class:: file_wrapper()
@@ -318,13 +323,10 @@ connections and dispatches the incoming connections to a handler::
 
         def handle_accept(self):
             pair = self.accept()
-            if pair is None:
-                pass
-            else:
+            if pair is not None:
                 sock, addr = pair
                 print 'Incoming connection from %s' % repr(addr)
                 handler = EchoHandler(sock)
 
     server = EchoServer('localhost', 8080)
     asyncore.loop()
-

@@ -19,6 +19,11 @@ except ImportError:
     threading = None
 
 try:
+    import gzip
+except ImportError:
+    gzip = None
+
+try:
     unicode
 except NameError:
     have_unicode = False
@@ -589,6 +594,12 @@ class SimpleServerTestCase(BaseServerTestCase):
         # This avoids waiting for the socket timeout.
         self.test_simple1()
 
+    def test_partial_post(self):
+        # Check that a partial POST doesn't make the server loop: issue #14001.
+        conn = httplib.HTTPConnection(ADDR, PORT)
+        conn.request('POST', '/RPC2 HTTP/1.0\r\nContent-Length: 100\r\n\r\nbye')
+        conn.close()
+
 class MultiPathServerTestCase(BaseServerTestCase):
     threadFunc = staticmethod(http_multi_server)
     request_count = 2
@@ -675,6 +686,7 @@ class KeepaliveServerTestCase2(BaseKeepaliveServerTestCase):
 
 #A test case that verifies that gzip encoding works in both directions
 #(for a request and the response)
+@unittest.skipUnless(gzip, 'gzip not available')
 class GzipServerTestCase(BaseServerTestCase):
     #a request handler that supports keep-alive and logs requests into a
     #class variable
@@ -1005,11 +1017,7 @@ def test_main():
     xmlrpc_tests.append(SimpleServerTestCase)
     xmlrpc_tests.append(KeepaliveServerTestCase1)
     xmlrpc_tests.append(KeepaliveServerTestCase2)
-    try:
-        import gzip
-        xmlrpc_tests.append(GzipServerTestCase)
-    except ImportError:
-        pass #gzip not supported in this build
+    xmlrpc_tests.append(GzipServerTestCase)
     xmlrpc_tests.append(MultiPathServerTestCase)
     xmlrpc_tests.append(ServerProxyTestCase)
     xmlrpc_tests.append(FailingServerTestCase)

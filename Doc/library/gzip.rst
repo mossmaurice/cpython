@@ -22,9 +22,6 @@ Note that additional file formats which can be decompressed by the
 :program:`gzip` and :program:`gunzip` programs, such  as those produced by
 :program:`compress` and :program:`pack`, are not supported by this module.
 
-For other archive formats, see the :mod:`bz2`, :mod:`zipfile`, and
-:mod:`tarfile` modules.
-
 The module defines the following items:
 
 
@@ -36,12 +33,12 @@ The module defines the following items:
    given a non-trivial value.
 
    The new class instance is based on *fileobj*, which can be a regular file, a
-   :class:`StringIO` object, or any other object which simulates a file.  It
+   :class:`~StringIO.StringIO` object, or any other object which simulates a file.  It
    defaults to ``None``, in which case *filename* is opened to provide a file
    object.
 
    When *fileobj* is not ``None``, the *filename* argument is only used to be
-   included in the :program:`gzip` file header, which may includes the original
+   included in the :program:`gzip` file header, which may include the original
    filename of the uncompressed file.  It defaults to the filename of *fileobj*, if
    discernible; otherwise, it defaults to the empty string, and in this case the
    original filename is not included in the header.
@@ -52,9 +49,10 @@ The module defines the following items:
    not given, the 'b' flag will be added to the mode to ensure the file is opened
    in binary mode for cross-platform portability.
 
-   The *compresslevel* argument is an integer from ``1`` to ``9`` controlling the
-   level of compression; ``1`` is fastest and produces the least compression, and
-   ``9`` is slowest and produces the most compression.  The default is ``9``.
+   The *compresslevel* argument is an integer from ``0`` to ``9`` controlling
+   the level of compression; ``1`` is fastest and produces the least
+   compression, and ``9`` is slowest and produces the most compression. ``0``
+   is no compression. The default is ``9``.
 
    The *mtime* argument is an optional numeric timestamp to be written to
    the stream when compressing.  All :program:`gzip` compressed streams are
@@ -67,9 +65,9 @@ The module defines the following items:
 
    Calling a :class:`GzipFile` object's :meth:`close` method does not close
    *fileobj*, since you might wish to append more material after the compressed
-   data.  This also allows you to pass a :class:`StringIO` object opened for
+   data.  This also allows you to pass a :class:`~StringIO.StringIO` object opened for
    writing as *fileobj*, and retrieve the resulting memory buffer using the
-   :class:`StringIO` object's :meth:`getvalue` method.
+   :class:`StringIO` object's :meth:`~StringIO.StringIO.getvalue` method.
 
    :class:`GzipFile` supports iteration and the :keyword:`with` statement.
 
@@ -78,6 +76,9 @@ The module defines the following items:
 
    .. versionchanged:: 2.7
       Support for zero-padded files was added.
+
+   .. versionadded:: 2.7
+      The *mtime* argument.
 
 
 .. function:: open(filename[, mode[, compresslevel]])
@@ -95,7 +96,7 @@ Examples of usage
 Example of how to read a compressed file::
 
    import gzip
-   f = gzip.open('/home/joe/file.txt.gz', 'rb')
+   f = gzip.open('file.txt.gz', 'rb')
    file_content = f.read()
    f.close()
 
@@ -103,15 +104,15 @@ Example of how to create a compressed GZIP file::
 
    import gzip
    content = "Lots of content here"
-   f = gzip.open('/home/joe/file.txt.gz', 'wb')
+   f = gzip.open('file.txt.gz', 'wb')
    f.write(content)
    f.close()
 
 Example of how to GZIP compress an existing file::
 
    import gzip
-   f_in = open('/home/joe/file.txt', 'rb')
-   f_out = gzip.open('/home/joe/file.txt.gz', 'wb')
+   f_in = open('file.txt', 'rb')
+   f_out = gzip.open('file.txt.gz', 'wb')
    f_out.writelines(f_in)
    f_out.close()
    f_in.close()

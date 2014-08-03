@@ -207,7 +207,7 @@ Ellipsis
             single: True
 
          These represent the truth values False and True.  The two objects
-         representing the values False and True are the only Boolean objects.
+         representing the values ``False`` and ``True`` are the only Boolean objects.
          The Boolean type is a subtype of plain integers, and Boolean values
          behave like the values 0 and 1, respectively, in almost all contexts,
          the exception being that when converted to a string, the strings
@@ -356,8 +356,6 @@ Sequences
          object: mutable sequence
          object: mutable
          pair: assignment; statement
-         single: delete
-         statement: del
          single: subscription
          single: slicing
 
@@ -411,7 +409,7 @@ Set types
 
       These represent a mutable set. They are created by the built-in :func:`set`
       constructor and can be modified afterwards by several methods, such as
-      :meth:`add`.
+      :meth:`~set.add`.
 
    Frozen sets
       .. index:: object: frozenset
@@ -481,47 +479,44 @@ Callable types
 
       Special attributes:
 
+      .. tabularcolumns:: |l|L|l|
+
       +-----------------------+-------------------------------+-----------+
       | Attribute             | Meaning                       |           |
       +=======================+===============================+===========+
-      | :attr:`func_doc`      | The function's documentation  | Writable  |
-      |                       | string, or ``None`` if        |           |
-      |                       | unavailable                   |           |
+      | :attr:`__doc__`       | The function's documentation  | Writable  |
+      | :attr:`func_doc`      | string, or ``None`` if        |           |
+      |                       | unavailable.                  |           |
       +-----------------------+-------------------------------+-----------+
-      | :attr:`__doc__`       | Another way of spelling       | Writable  |
-      |                       | :attr:`func_doc`              |           |
-      +-----------------------+-------------------------------+-----------+
-      | :attr:`func_name`     | The function's name           | Writable  |
-      +-----------------------+-------------------------------+-----------+
-      | :attr:`__name__`      | Another way of spelling       | Writable  |
-      |                       | :attr:`func_name`             |           |
+      | :attr:`__name__`      | The function's name.          | Writable  |
+      | :attr:`func_name`     |                               |           |
       +-----------------------+-------------------------------+-----------+
       | :attr:`__module__`    | The name of the module the    | Writable  |
       |                       | function was defined in, or   |           |
       |                       | ``None`` if unavailable.      |           |
       +-----------------------+-------------------------------+-----------+
-      | :attr:`func_defaults` | A tuple containing default    | Writable  |
-      |                       | argument values for those     |           |
+      | :attr:`__defaults__`  | A tuple containing default    | Writable  |
+      | :attr:`func_defaults` | argument values for those     |           |
       |                       | arguments that have defaults, |           |
       |                       | or ``None`` if no arguments   |           |
-      |                       | have a default value          |           |
+      |                       | have a default value.         |           |
       +-----------------------+-------------------------------+-----------+
-      | :attr:`func_code`     | The code object representing  | Writable  |
-      |                       | the compiled function body.   |           |
+      | :attr:`__code__`      | The code object representing  | Writable  |
+      | :attr:`func_code`     | the compiled function body.   |           |
       +-----------------------+-------------------------------+-----------+
-      | :attr:`func_globals`  | A reference to the dictionary | Read-only |
-      |                       | that holds the function's     |           |
+      | :attr:`__globals__`   | A reference to the dictionary | Read-only |
+      | :attr:`func_globals`  | that holds the function's     |           |
       |                       | global variables --- the      |           |
       |                       | global namespace of the       |           |
       |                       | module in which the function  |           |
       |                       | was defined.                  |           |
       +-----------------------+-------------------------------+-----------+
-      | :attr:`func_dict`     | The namespace supporting      | Writable  |
-      |                       | arbitrary function            |           |
+      | :attr:`__dict__`      | The namespace supporting      | Writable  |
+      | :attr:`func_dict`     | arbitrary function            |           |
       |                       | attributes.                   |           |
       +-----------------------+-------------------------------+-----------+
-      | :attr:`func_closure`  | ``None`` or a tuple of cells  | Read-only |
-      |                       | that contain bindings for the |           |
+      | :attr:`__closure__`   | ``None`` or a tuple of cells  | Read-only |
+      | :attr:`func_closure`  | that contain bindings for the |           |
       |                       | function's free variables.    |           |
       +-----------------------+-------------------------------+-----------+
 
@@ -529,6 +524,12 @@ Callable types
 
       .. versionchanged:: 2.4
          ``func_name`` is now writable.
+
+      .. versionchanged:: 2.6
+         The double-underscore attributes ``__closure__``, ``__code__``,
+         ``__defaults__``, and ``__globals__`` were introduced as aliases for
+         the corresponding ``func_*`` attributes for forwards compatibility
+         with Python 3.
 
       Function objects also support getting and setting arbitrary attributes, which
       can be used, for example, to attach metadata to functions.  Regular attribute
@@ -540,16 +541,21 @@ Callable types
       code object; see the description of internal types below.
 
       .. index::
-         single: func_doc (function attribute)
          single: __doc__ (function attribute)
          single: __name__ (function attribute)
          single: __module__ (function attribute)
          single: __dict__ (function attribute)
+         single: __defaults__ (function attribute)
+         single: __code__ (function attribute)
+         single: __globals__ (function attribute)
+         single: __closure__ (function attribute)
+         single: func_doc (function attribute)
+         single: func_name (function attribute)
+         single: func_dict (function attribute)
          single: func_defaults (function attribute)
-         single: func_closure (function attribute)
          single: func_code (function attribute)
          single: func_globals (function attribute)
-         single: func_dict (function attribute)
+         single: func_closure (function attribute)
          pair: global; namespace
 
    User-defined methods
@@ -573,7 +579,7 @@ Callable types
          :attr:`im_self` used to refer to the class that defined the method.
 
       .. versionchanged:: 2.6
-         For 3.0 forward-compatibility, :attr:`im_func` is also available as
+         For Python 3 forward-compatibility, :attr:`im_func` is also available as
          :attr:`__func__`, and :attr:`im_self` as :attr:`__self__`.
 
       .. index::
@@ -621,9 +627,8 @@ Callable types
          single: im_self (method attribute)
 
       When a user-defined method object is created by retrieving a class method object
-      from a class or instance, its :attr:`im_self` attribute is the class itself (the
-      same as the :attr:`im_class` attribute), and its :attr:`im_func` attribute is
-      the function object underlying the class method.
+      from a class or instance, its :attr:`im_self` attribute is the class itself, and
+      its :attr:`im_func` attribute is the function object underlying the class method.
 
       When an unbound user-defined method object is called, the underlying function
       (:attr:`im_func`) is called, with the restriction that the first argument must
@@ -660,7 +665,8 @@ Callable types
       :ref:`yield`) is called a :dfn:`generator
       function`.  Such a function, when called, always returns an iterator object
       which can be used to execute the body of the function:  calling the iterator's
-      :meth:`next` method will cause the function to execute until it provides a value
+      :meth:`~iterator.next` method will cause the function to execute until
+      it provides a value
       using the :keyword:`yield` statement.  When the function executes a
       :keyword:`return` statement or falls off the end, a :exc:`StopIteration`
       exception is raised and the iterator will have reached the end of the set of
@@ -795,8 +801,8 @@ Classes
    associated class is either :class:`C` or one of its base classes, it is
    transformed into an unbound user-defined method object whose :attr:`im_class`
    attribute is :class:`C`. When it would yield a class method object, it is
-   transformed into a bound user-defined method object whose :attr:`im_class`
-   and :attr:`im_self` attributes are both :class:`C`.  When it would yield a
+   transformed into a bound user-defined method object whose
+   :attr:`im_self` attribute is :class:`C`.  When it would yield a
    static method object, it is transformed into the object wrapped by the static
    method object. See section :ref:`descriptors` for another way in which
    attributes retrieved from a class may differ from those actually contained in
@@ -820,10 +826,10 @@ Classes
 
    Special attributes: :attr:`__name__` is the class name; :attr:`__module__` is
    the module name in which the class was defined; :attr:`__dict__` is the
-   dictionary containing the class's namespace; :attr:`__bases__` is a tuple
-   (possibly empty or a singleton) containing the base classes, in the order of
-   their occurrence in the base class list; :attr:`__doc__` is the class's
-   documentation string, or None if undefined.
+   dictionary containing the class's namespace; :attr:`~class.__bases__` is a
+   tuple (possibly empty or a singleton) containing the base classes, in the
+   order of their occurrence in the base class list; :attr:`__doc__` is the
+   class's documentation string, or None if undefined.
 
 Class instances
    .. index::
@@ -868,8 +874,8 @@ Class instances
       single: __dict__ (instance attribute)
       single: __class__ (instance attribute)
 
-   Special attributes: :attr:`__dict__` is the attribute dictionary;
-   :attr:`__class__` is the instance's class.
+   Special attributes: :attr:`~object.__dict__` is the attribute dictionary;
+   :attr:`~instance.__class__` is the instance's class.
 
 Files
    .. index::
@@ -1068,9 +1074,9 @@ Internal types
          single: stop (slice object attribute)
          single: step (slice object attribute)
 
-      Special read-only attributes: :attr:`start` is the lower bound; :attr:`stop` is
-      the upper bound; :attr:`step` is the step value; each is ``None`` if omitted.
-      These attributes can have any type.
+      Special read-only attributes: :attr:`~slice.start` is the lower bound;
+      :attr:`~slice.stop` is the upper bound; :attr:`~slice.step` is the step
+      value; each is ``None`` if omitted.  These attributes can have any type.
 
       Slice objects support one method:
 
@@ -1149,7 +1155,7 @@ sources of additional information.
    single: class; classic
    single: class; old-style
 
-Old-style classes are removed in Python 3.0, leaving only the semantics of
+Old-style classes are removed in Python 3, leaving only the semantics of
 new-style classes.
 
 
@@ -1177,7 +1183,8 @@ When implementing a class that emulates any built-in type, it is important that
 the emulation only be implemented to the degree that it makes sense for the
 object being modelled.  For example, some sequences may work well with retrieval
 of individual elements, but extracting a slice may not make sense.  (One example
-of this is the :class:`NodeList` interface in the W3C's Document Object Model.)
+of this is the :class:`~xml.dom.NodeList` interface in the W3C's Document
+Object Model.)
 
 
 .. _customization:
@@ -1281,6 +1288,8 @@ Basic customization
       references to such globals exist, this may help in assuring that imported
       modules are still available at the time when the :meth:`__del__` method is
       called.
+
+   See also the :option:`-R` command-line option.
 
 
 .. method:: object.__repr__(self)
@@ -1411,7 +1420,7 @@ Basic customization
 
    User-defined classes have :meth:`__cmp__` and :meth:`__hash__` methods
    by default; with them, all objects compare unequal (except with themselves)
-   and ``x.__hash__()`` returns ``id(x)``.
+   and ``x.__hash__()`` returns a result derived from ``id(x)``.
 
    Classes which inherit a :meth:`__hash__` method from a parent class but
    change the meaning of :meth:`__cmp__` or :meth:`__eq__` such that the hash
@@ -1807,10 +1816,10 @@ case the instance is itself a class.
 
    :pep:`3119` - Introducing Abstract Base Classes
       Includes the specification for customizing :func:`isinstance` and
-      :func:`issubclass` behavior through :meth:`__instancecheck__` and
-      :meth:`__subclasscheck__`, with motivation for this functionality in the
-      context of adding Abstract Base Classes (see the :mod:`abc` module) to the
-      language.
+      :func:`issubclass` behavior through :meth:`~class.__instancecheck__` and
+      :meth:`~class.__subclasscheck__`, with motivation for this functionality
+      in the context of adding Abstract Base Classes (see the :mod:`abc`
+      module) to the language.
 
 
 .. _callable-types:
@@ -1843,7 +1852,7 @@ range of items. (For backwards compatibility, the method :meth:`__getslice__`
 is also recommended that mappings provide the methods :meth:`keys`,
 :meth:`values`, :meth:`items`, :meth:`has_key`, :meth:`get`, :meth:`clear`,
 :meth:`setdefault`, :meth:`iterkeys`, :meth:`itervalues`, :meth:`iteritems`,
-:meth:`pop`, :meth:`popitem`, :meth:`copy`, and :meth:`update` behaving similar
+:meth:`pop`, :meth:`popitem`, :meth:`!copy`, and :meth:`update` behaving similar
 to those for Python's standard dictionary objects.  The :mod:`UserDict` module
 provides a :class:`DictMixin` class to help create those methods from a base set
 of :meth:`__getitem__`, :meth:`__setitem__`, :meth:`__delitem__`, and
@@ -2233,7 +2242,7 @@ Coercion rules
 This section used to document the rules for coercion.  As the language has
 evolved, the coercion rules have become hard to document precisely; documenting
 what one version of one particular implementation does is undesirable.  Instead,
-here are some informal guidelines regarding coercion.  In Python 3.0, coercion
+here are some informal guidelines regarding coercion.  In Python 3, coercion
 will not be supported.
 
 *

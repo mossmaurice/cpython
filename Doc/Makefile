@@ -40,7 +40,7 @@ help:
 checkout:
 	@if [ ! -d tools/sphinx ]; then \
 	  echo "Checking out Sphinx..."; \
-	  svn checkout $(SVNROOT)/external/Sphinx-0.6.7/sphinx tools/sphinx; \
+	  svn checkout $(SVNROOT)/external/Sphinx-1.0.7/sphinx tools/sphinx; \
 	fi
 	@if [ ! -d tools/docutils ]; then \
 	  echo "Checking out Docutils..."; \
@@ -86,24 +86,30 @@ changes: build
 	@echo "The overview file is in build/changes."
 
 linkcheck: BUILDER = linkcheck
-linkcheck: build
-	@echo "Link check complete; look for any errors in the above output" \
-	      "or in build/$(BUILDER)/output.txt"
+linkcheck:
+	@$(MAKE) build BUILDER=$(BUILDER) || { \
+	echo "Link check complete; look for any errors in the above output" \
+	     "or in build/$(BUILDER)/output.txt"; \
+	false; }
 
 suspicious: BUILDER = suspicious
-suspicious: build
-	@echo "Suspicious check complete; look for any errors in the above output" \
-	      "or in build/$(BUILDER)/suspicious.csv.  If all issues are false" \
-	      "positives, append that file to tools/sphinxext/susp-ignored.csv."
+suspicious:
+	@$(MAKE) build BUILDER=$(BUILDER) || { \
+	echo "Suspicious check complete; look for any errors in the above output" \
+	     "or in build/$(BUILDER)/suspicious.csv.  If all issues are false" \
+	     "positives, append that file to tools/sphinxext/susp-ignored.csv."; \
+	false; }
 
 coverage: BUILDER = coverage
 coverage: build
 	@echo "Coverage finished; see c.txt and python.txt in build/coverage"
 
 doctest: BUILDER = doctest
-doctest: build
-	@echo "Testing of doctests in the sources finished, look at the" \
-	      "results in build/doctest/output.txt"
+doctest:
+	@$(MAKE) build BUILDER=$(BUILDER) || { \
+	echo "Testing of doctests in the sources finished, look at the" \
+	     "results in build/doctest/output.txt"; \
+	false; }
 
 pydoc-topics: BUILDER = pydoc-topics
 pydoc-topics: build
@@ -169,12 +175,19 @@ serve:
 # for development releases: always build
 autobuild-dev:
 	make update
-	make dist SPHINXOPTS='-A daily=1'
+	make dist SPHINXOPTS='-A daily=1 -A versionswitcher=1'
+	-make suspicious
 
-# for stable releases: only build if not in pre-release stage (alpha, beta, rc)
+# for quick rebuilds (HTML only)
+autobuild-html:
+	make html SPHINXOPTS='-A daily=1 -A versionswitcher=1'
+
+# for stable releases: only build if not in pre-release stage (alpha, beta)
+# release candidate downloads are okay, since the stable tree can be in that stage
 autobuild-stable:
-	@case $(DISTVERSION) in *[abc]*) \
+	@case $(DISTVERSION) in *[ab]*) \
 		echo "Not building; $(DISTVERSION) is not a release version."; \
 		exit 1;; \
 	esac
 	@make autobuild-dev
+

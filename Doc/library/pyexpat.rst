@@ -14,6 +14,14 @@
    directive.  Since they are attributes which are set by client code, in-text
    references to these attributes should be marked using the :member: role.
 
+
+.. warning::
+
+   The :mod:`pyexpat` module is not secure against maliciously
+   constructed data.  If you need to parse untrusted or unauthenticated data see
+   :ref:`xml-vulnerabilities`.
+
+
 .. versionadded:: 2.0
 
 .. index:: single: Expat
@@ -95,6 +103,10 @@ The :mod:`xml.parsers.expat` module contains two functions:
       http://www.python.org/ns/ elem1
       elem2
 
+   Due to limitations in the ``Expat`` library used by :mod:`pyexpat`,
+   the :class:`xmlparser` instance returned can only be used to parse a single
+   XML document.  Call ``ParserCreate`` for each document to provide unique
+   parser instances.
 
 .. seealso::
 
@@ -114,7 +126,9 @@ XMLParser Objects
 
    Parses the contents of the string *data*, calling the appropriate handler
    functions to process the parsed data.  *isfinal* must be true on the final call
-   to this method.  *data* can be the empty string at any time.
+   to this method; it allows the parsing of a single file in fragments,
+   not the submission of multiple files.
+   *data* can be the empty string at any time.
 
 
 .. method:: xmlparser.ParseFile(file)
@@ -437,7 +451,7 @@ otherwise stated.
 .. method:: xmlparser.CommentHandler(data)
 
    Called for comments.  *data* is the text of the comment, excluding the leading
-   '``<!-``\ ``-``' and trailing '``-``\ ``->``'.
+   ``'<!-``\ ``-'`` and trailing ``'-``\ ``->'``.
 
 
 .. method:: xmlparser.StartCdataSectionHandler()
@@ -898,5 +912,5 @@ The ``errors`` object has the following attributes:
 .. [#] The encoding string included in XML output should conform to the
    appropriate standards. For example, "UTF-8" is valid, but "UTF8" is
    not. See http://www.w3.org/TR/2006/REC-xml11-20060816/#NT-EncodingDecl
-   and http://www.iana.org/assignments/character-sets .
+   and http://www.iana.org/assignments/character-sets\ .
 

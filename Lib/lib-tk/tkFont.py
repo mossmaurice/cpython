@@ -78,7 +78,8 @@ class Font:
         if exists:
             self.delete_font = False
             # confirm font exists
-            if self.name not in root.tk.call("font", "names"):
+            if self.name not in root.tk.splitlist(
+                    root.tk.call("font", "names")):
                 raise Tkinter._tkinter.TclError, "named font %s does not already exist" % (self.name,)
             # if font config info supplied, apply it
             if font:
@@ -96,7 +97,7 @@ class Font:
         return self.name
 
     def __eq__(self, other):
-        return self.name == other.name and isinstance(other, Font)
+        return isinstance(other, Font) and self.name == other.name
 
     def __getitem__(self, key):
         return self.cget(key)

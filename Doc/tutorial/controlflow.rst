@@ -19,14 +19,14 @@ example::
    >>> x = int(raw_input("Please enter an integer: "))
    Please enter an integer: 42
    >>> if x < 0:
-   ...      x = 0
-   ...      print 'Negative changed to zero'
+   ...     x = 0
+   ...     print 'Negative changed to zero'
    ... elif x == 0:
-   ...      print 'Zero'
+   ...     print 'Zero'
    ... elif x == 1:
-   ...      print 'Single'
+   ...     print 'Single'
    ... else:
-   ...      print 'More'
+   ...     print 'More'
    ...
    More
 
@@ -59,24 +59,24 @@ they appear in the sequence.  For example (no pun intended):
 ::
 
    >>> # Measure some strings:
-   ... a = ['cat', 'window', 'defenestrate']
-   >>> for x in a:
-   ...     print x, len(x)
+   ... words = ['cat', 'window', 'defenestrate']
+   >>> for w in words:
+   ...     print w, len(w)
    ...
    cat 3
    window 6
    defenestrate 12
 
-It is not safe to modify the sequence being iterated over in the loop (this can
-only happen for mutable sequence types, such as lists).  If you need to modify
-the list you are iterating over (for example, to duplicate selected items) you
-must iterate over a copy.  The slice notation makes this particularly
-convenient::
+If you need to modify the sequence you are iterating over while inside the loop
+(for example to duplicate selected items), it is recommended that you first
+make a copy.  Iterating over a sequence does not implicitly make a copy.  The
+slice notation makes this especially convenient::
 
-   >>> for x in a[:]: # make a slice copy of the entire list
-   ...    if len(x) > 6: a.insert(0, x)
+   >>> for w in words[:]:  # Loop over a slice copy of the entire list.
+   ...     if len(w) > 6:
+   ...         words.insert(0, w)
    ...
-   >>> a
+   >>> words
    ['defenestrate', 'cat', 'window', 'defenestrate']
 
 
@@ -129,9 +129,6 @@ function, see :ref:`tut-loopidioms`.
 The :keyword:`break` statement, like in C, breaks out of the smallest enclosing
 :keyword:`for` or :keyword:`while` loop.
 
-The :keyword:`continue` statement, also borrowed from C, continues with the next
-iteration of the loop.
-
 Loop statements may have an ``else`` clause; it is executed when the loop
 terminates through exhaustion of the list (with :keyword:`for`) or when the
 condition becomes false (with :keyword:`while`), but not when the loop is
@@ -158,6 +155,30 @@ following loop, which searches for prime numbers::
 
 (Yes, this is the correct code.  Look closely: the ``else`` clause belongs to
 the :keyword:`for` loop, **not** the :keyword:`if` statement.)
+
+When used with a loop, the ``else`` clause has more in common with the
+``else`` clause of a :keyword:`try` statement than it does that of
+:keyword:`if` statements: a :keyword:`try` statement's ``else`` clause runs
+when no exception occurs, and a loop's ``else`` clause runs when no ``break``
+occurs. For more on the :keyword:`try` statement and exceptions, see
+:ref:`tut-handling`.
+
+The :keyword:`continue` statement, also borrowed from C, continues with the next
+iteration of the loop::
+
+    >>> for num in range(2, 10):
+    ...     if num % 2 == 0:
+    ...         print "Found an even number", num
+    ...         continue
+    ...     print "Found a number", num
+    Found an even number 2
+    Found a number 3
+    Found an even number 4
+    Found a number 5
+    Found an even number 6
+    Found a number 7
+    Found an even number 8
+    Found a number 9
 
 
 .. _tut-pass:
@@ -520,17 +541,16 @@ In the same fashion, dictionaries can deliver keyword arguments with the ``**``\
 
 .. _tut-lambda:
 
-Lambda Forms
-------------
+Lambda Expressions
+------------------
 
-By popular demand, a few features commonly found in functional programming
-languages like Lisp have been added to Python.  With the :keyword:`lambda`
-keyword, small anonymous functions can be created. Here's a function that
-returns the sum of its two arguments: ``lambda a, b: a+b``.  Lambda forms can be
-used wherever function objects are required.  They are syntactically restricted
-to a single expression.  Semantically, they are just syntactic sugar for a
-normal function definition.  Like nested function definitions, lambda forms can
-reference variables from the containing scope::
+Small anonymous functions can be created with the :keyword:`lambda` keyword.
+This function returns the sum of its two arguments: ``lambda a, b: a+b``.
+Lambda functions can be used wherever function objects are required.  They are
+syntactically restricted to a single expression.  Semantically, they are just
+syntactic sugar for a normal function definition.  Like nested function
+definitions, lambda functions can reference variables from the containing
+scope::
 
    >>> def make_incrementor(n):
    ...     return lambda x: x + n
@@ -540,6 +560,14 @@ reference variables from the containing scope::
    42
    >>> f(1)
    43
+
+The above example uses a lambda expression to return a function.  Another use
+is to pass a small function as an argument::
+
+   >>> pairs = [(1, 'one'), (2, 'two'), (3, 'three'), (4, 'four')]
+   >>> pairs.sort(key=lambda pair: pair[1])
+   >>> pairs
+   [(4, 'four'), (1, 'one'), (3, 'three'), (2, 'two')]
 
 
 .. _tut-docstrings:

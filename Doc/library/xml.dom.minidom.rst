@@ -1,8 +1,8 @@
-:mod:`xml.dom.minidom` --- Lightweight DOM implementation
-=========================================================
+:mod:`xml.dom.minidom` --- Minimal DOM implementation
+=====================================================
 
 .. module:: xml.dom.minidom
-   :synopsis: Lightweight Document Object Model (DOM) implementation.
+   :synopsis: Minimal Document Object Model (DOM) implementation.
 .. moduleauthor:: Paul Prescod <paul@prescod.net>
 .. sectionauthor:: Paul Prescod <paul@prescod.net>
 .. sectionauthor:: Martin v. Löwis <martin@v.loewis.de>
@@ -14,9 +14,19 @@
 
 --------------
 
-:mod:`xml.dom.minidom` is a light-weight implementation of the Document Object
-Model interface.  It is intended to be simpler than the full DOM and also
-significantly smaller.
+:mod:`xml.dom.minidom` is a minimal implementation of the Document Object
+Model interface, with an API similar to that in other languages.  It is intended
+to be simpler than the full DOM and also significantly smaller.  Users who are
+not already proficient with the DOM should consider using the
+:mod:`xml.etree.ElementTree` module for their XML processing instead
+
+
+.. warning::
+
+   The :mod:`xml.dom.minidom` module is not secure against
+   maliciously constructed data.  If you need to parse untrusted or
+   unauthenticated data see :ref:`xml-vulnerabilities`.
+
 
 DOM applications typically start by parsing some XML into a DOM.  With
 :mod:`xml.dom.minidom`, this is done through the parse functions::
@@ -48,7 +58,7 @@ instead:
 .. function:: parseString(string[, parser])
 
    Return a :class:`Document` that represents the *string*. This method creates a
-   :class:`StringIO` object for the string and passes that on to :func:`parse`.
+   :class:`~StringIO.StringIO` object for the string and passes that on to :func:`parse`.
 
 Both functions return a :class:`Document` object representing the content of the
 document.
@@ -121,7 +131,7 @@ module documentation.  This section lists the differences between the API and
    to discard children of that node.
 
 
-.. method:: Node.writexml(writer[, indent=""[, addindent=""[, newl=""]]])
+.. method:: Node.writexml(writer, indent="", addindent="", newl="")
 
    Write XML to the writer object.  The writer should have a :meth:`write` method
    which matches that of the file object interface.  The *indent* parameter is the
@@ -266,4 +276,4 @@ utility to most DOM users.
 .. [#] The encoding string included in XML output should conform to the
    appropriate standards. For example, "UTF-8" is valid, but "UTF8" is
    not. See http://www.w3.org/TR/2006/REC-xml11-20060816/#NT-EncodingDecl
-   and http://www.iana.org/assignments/character-sets .
+   and http://www.iana.org/assignments/character-sets\ .

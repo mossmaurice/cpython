@@ -337,6 +337,77 @@ object and the argument list, and the function object is called with this new
 argument list.
 
 
+.. _tut-class-and-instance-variables:
+
+Class and Instance Variables
+----------------------------
+
+Generally speaking, instance variables are for data unique to each instance
+and class variables are for attributes and methods shared by all instances
+of the class::
+
+    class Dog:
+
+        kind = 'canine'         # class variable shared by all instances
+
+        def __init__(self, name):
+            self.name = name    # instance variable unique to each instance
+
+    >>> d = Dog('Fido')
+    >>> e = Dog('Buddy')
+    >>> d.kind                  # shared by all dogs
+    'canine'
+    >>> e.kind                  # shared by all dogs
+    'canine'
+    >>> d.name                  # unique to d
+    'Fido'
+    >>> e.name                  # unique to e
+    'Buddy'
+
+As discussed in :ref:`tut-object`, shared data can have possibly surprising
+effects with involving :term:`mutable` objects such as lists and dictionaries.
+For example, the *tricks* list in the following code should not be used as a
+class variable because just a single list would be shared by all *Dog*
+instances::
+
+    class Dog:
+
+        tricks = []             # mistaken use of a class variable
+
+        def __init__(self, name):
+            self.name = name
+
+        def add_trick(self, trick):
+            self.tricks.append(trick)
+
+    >>> d = Dog('Fido')
+    >>> e = Dog('Buddy')
+    >>> d.add_trick('roll over')
+    >>> e.add_trick('play dead')
+    >>> d.tricks                # unexpectedly shared by all dogs
+    ['roll over', 'play dead']
+
+Correct design of the class should use an instance variable instead::
+
+    class Dog:
+
+        def __init__(self, name):
+            self.name = name
+            self.tricks = []    # creates a new empty list for each dog
+
+        def add_trick(self, trick):
+            self.tricks.append(trick)
+
+    >>> d = Dog('Fido')
+    >>> e = Dog('Buddy')
+    >>> d.add_trick('roll over')
+    >>> e.add_trick('play dead')
+    >>> d.tricks
+    ['roll over']
+    >>> e.tricks
+    ['play dead']
+
+
 .. _tut-remarks:
 
 Random Remarks
@@ -409,8 +480,8 @@ argument::
            self.add(x)
 
 Methods may reference global names in the same way as ordinary functions.  The
-global scope associated with a method is the module containing the class
-definition.  (The class itself is never used as a global scope.)  While one
+global scope associated with a method is the module containing its
+definition.  (A class is never used as a global scope.)  While one
 rarely encounters a good reason for using global data in a method, there are
 many legitimate uses of the global scope: for one thing, functions and modules
 imported into the global scope can be used by methods, as well as functions and
@@ -534,8 +605,8 @@ http://www.python.org/download/releases/2.3/mro/.
 
 .. _tut-private:
 
-Private Variables
-=================
+Private Variables and Class-local References
+============================================
 
 "Private" instance variables that cannot be accessed except from inside an
 object don't exist in Python.  However, there is a convention that is followed
@@ -609,7 +680,7 @@ will do nicely::
 A piece of Python code that expects a particular abstract data type can often be
 passed a class that emulates the methods of that data type instead.  For
 instance, if you have a function that formats some data from a file object, you
-can define a class with methods :meth:`read` and :meth:`readline` that get the
+can define a class with methods :meth:`read` and :meth:`!readline` that get the
 data from a string buffer instead, and pass it as an argument.
 
 .. (Unfortunately, this technique has its limitations: a class can't define
@@ -688,14 +759,15 @@ using a :keyword:`for` statement::
    for char in "123":
        print char
    for line in open("myfile.txt"):
-       print line
+       print line,
 
 This style of access is clear, concise, and convenient.  The use of iterators
 pervades and unifies Python.  Behind the scenes, the :keyword:`for` statement
 calls :func:`iter` on the container object.  The function returns an iterator
-object that defines the method :meth:`next` which accesses elements in the
-container one at a time.  When there are no more elements, :meth:`next` raises a
-:exc:`StopIteration` exception which tells the :keyword:`for` loop to terminate.
+object that defines the method :meth:`~iterator.next` which accesses elements
+in the container one at a time.  When there are no more elements,
+:meth:`~iterator.next` raises a :exc:`StopIteration` exception which tells the
+:keyword:`for` loop to terminate.
 This example shows how it all works::
 
    >>> s = 'abc'

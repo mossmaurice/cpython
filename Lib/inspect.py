@@ -165,7 +165,7 @@ def isgenerator(object):
     """Return true if the object is a generator.
 
     Generator objects provide these attributes:
-        __iter__        defined to support interation over container
+        __iter__        defined to support iteration over container
         close           raises a new GeneratorExit exception inside the
                         generator to terminate the iteration
         gi_code         code object
@@ -288,30 +288,21 @@ def classify_class_attrs(cls):
     names = dir(cls)
     result = []
     for name in names:
-        # Get the object associated with the name.
+        # Get the object associated with the name, and where it was defined.
         # Getting an obj from the __dict__ sometimes reveals more than
         # using getattr.  Static and class methods are dramatic examples.
-        if name in cls.__dict__:
-            obj = cls.__dict__[name]
+        # Furthermore, some objects may raise an Exception when fetched with
+        # getattr(). This is the case with some descriptors (bug #1785).
+        # Thus, we only use getattr() as a last resort.
+        homecls = None
+        for base in (cls,) + mro:
+            if name in base.__dict__:
+                obj = base.__dict__[name]
+                homecls = base
+                break
         else:
             obj = getattr(cls, name)
-
-        # Figure out where it was defined.
-        homecls = getattr(obj, "__objclass__", None)
-        if homecls is None:
-            # search the dicts.
-            for base in mro:
-                if name in base.__dict__:
-                    homecls = base
-                    break
-
-        # Get the object again, in order to get it from the defining
-        # __dict__ instead of via getattr (if possible).
-        if homecls is not None and name in homecls.__dict__:
-            obj = homecls.__dict__[name]
-
-        # Also get the object via getattr.
-        obj_via_getattr = getattr(cls, name)
+            homecls = getattr(obj, "__objclass__", homecls)
 
         # Classify the object.
         if isinstance(obj, staticmethod):
@@ -320,11 +311,18 @@ def classify_class_attrs(cls):
             kind = "class method"
         elif isinstance(obj, property):
             kind = "property"
-        elif (ismethod(obj_via_getattr) or
-              ismethoddescriptor(obj_via_getattr)):
+        elif ismethoddescriptor(obj):
             kind = "method"
-        else:
+        elif isdatadescriptor(obj):
             kind = "data"
+        else:
+            obj_via_getattr = getattr(cls, name)
+            if (ismethod(obj_via_getattr) or
+                ismethoddescriptor(obj_via_getattr)):
+                kind = "method"
+            else:
+                kind = "data"
+            obj = obj_via_getattr
 
         result.append(Attribute(name, kind, homecls, obj))
 
@@ -527,7 +525,7 @@ def findsource(object):
 
     file = getfile(object)
     sourcefile = getsourcefile(object)
-    if not sourcefile and file[0] + file[-1] != '<>':
+    if not sourcefile and file[:1] + file[-1:] != '<>':
         raise IOError('source code not available')
     file = sourcefile if sourcefile else file
 
@@ -730,7 +728,8 @@ def getclasstree(classes, unique=0):
             for parent in c.__bases__:
                 if not parent in children:
                     children[parent] = []
-                children[parent].append(c)
+                if c not in children[parent]:
+                    children[parent].append(c)
                 if unique and parent in classes: break
         elif c not in roots:
             roots.append(c)

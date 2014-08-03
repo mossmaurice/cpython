@@ -4,7 +4,9 @@
 Programming FAQ
 ===============
 
-.. contents::
+.. only:: html
+
+   .. contents::
 
 General Questions
 =================
@@ -147,7 +149,7 @@ There is a page on the wiki devoted to `performance tips
 <http://wiki.python.org/moin/PythonSpeed/PerformanceTips>`_.
 
 Guido van Rossum has written up an anecdote related to optimization at
-http://www.python.org/doc/essays/list2str.html.
+http://www.python.org/doc/essays/list2str.
 
 One thing to notice is that function and (especially) method calls are rather
 expensive; if you have designed a purely OO interface with lots of tiny
@@ -352,6 +354,58 @@ an imported module.  This clutter would defeat the usefulness of the ``global``
 declaration for identifying side-effects.
 
 
+Why do lambdas defined in a loop with different values all return the same result?
+----------------------------------------------------------------------------------
+
+Assume you use a for loop to define a few different lambdas (or even plain
+functions), e.g.::
+
+   >>> squares = []
+   >>> for x in range(5):
+   ...    squares.append(lambda: x**2)
+
+This gives you a list that contains 5 lambdas that calculate ``x**2``.  You
+might expect that, when called, they would return, respectively, ``0``, ``1``,
+``4``, ``9``, and ``16``.  However, when you actually try you will see that
+they all return ``16``::
+
+   >>> squares[2]()
+   16
+   >>> squares[4]()
+   16
+
+This happens because ``x`` is not local to the lambdas, but is defined in
+the outer scope, and it is accessed when the lambda is called --- not when it
+is defined.  At the end of the loop, the value of ``x`` is ``4``, so all the
+functions now return ``4**2``, i.e. ``16``.  You can also verify this by
+changing the value of ``x`` and see how the results of the lambdas change::
+
+   >>> x = 8
+   >>> squares[2]()
+   64
+
+In order to avoid this, you need to save the values in variables local to the
+lambdas, so that they don't rely on the value of the global ``x``::
+
+   >>> squares = []
+   >>> for x in range(5):
+   ...    squares.append(lambda n=x: n**2)
+
+Here, ``n=x`` creates a new variable ``n`` local to the lambda and computed
+when the lambda is defined so that it has the same value that ``x`` had at
+that point in the loop.  This means that the value of ``n`` will be ``0``
+in the first lambda, ``1`` in the second, ``2`` in the third, and so on.
+Therefore each lambda will now return the correct result::
+
+   >>> squares[2]()
+   4
+   >>> squares[4]()
+   16
+
+Note that this behaviour is not peculiar to lambdas, but applies to regular
+functions too.
+
+
 How do I share global variables across modules?
 ------------------------------------------------
 
@@ -445,6 +499,62 @@ the import inside the class but outside of any method still causes the import to
 occur when the module is initialized.
 
 
+Why are default values shared between objects?
+----------------------------------------------
+
+This type of bug commonly bites neophyte programmers.  Consider this function::
+
+   def foo(mydict={}):  # Danger: shared reference to one dict for all calls
+       ... compute something ...
+       mydict[key] = value
+       return mydict
+
+The first time you call this function, ``mydict`` contains a single item.  The
+second time, ``mydict`` contains two items because when ``foo()`` begins
+executing, ``mydict`` starts out with an item already in it.
+
+It is often expected that a function call creates new objects for default
+values. This is not what happens. Default values are created exactly once, when
+the function is defined.  If that object is changed, like the dictionary in this
+example, subsequent calls to the function will refer to this changed object.
+
+By definition, immutable objects such as numbers, strings, tuples, and ``None``,
+are safe from change. Changes to mutable objects such as dictionaries, lists,
+and class instances can lead to confusion.
+
+Because of this feature, it is good programming practice to not use mutable
+objects as default values.  Instead, use ``None`` as the default value and
+inside the function, check if the parameter is ``None`` and create a new
+list/dictionary/whatever if it is.  For example, don't write::
+
+   def foo(mydict={}):
+       ...
+
+but::
+
+   def foo(mydict=None):
+       if mydict is None:
+           mydict = {}  # create a new dict for local namespace
+
+This feature can be useful.  When you have a function that's time-consuming to
+compute, a common technique is to cache the parameters and the resulting value
+of each call to the function, and return the cached value if the same value is
+requested again.  This is called "memoizing", and can be implemented like this::
+
+   # Callers will never provide a third parameter for this function.
+   def expensive(arg1, arg2, _cache={}):
+       if (arg1, arg2) in _cache:
+           return _cache[(arg1, arg2)]
+
+       # Calculate the value
+       result = ... expensive computation ...
+       _cache[(arg1, arg2)] = result  # Store result in the cache
+       return result
+
+You could use a global variable containing a dictionary instead of the default
+value; it's a matter of taste.
+
+
 How can I pass optional or keyword parameters from one function to another?
 ---------------------------------------------------------------------------
 
@@ -467,6 +577,31 @@ In the unlikely case that you care about Python versions older than 2.0, use
        kwargs['width'] = '14.3c'
        ...
        apply(g, (x,)+args, kwargs)
+
+
+.. index::
+   single: argument; difference from parameter
+   single: parameter; difference from argument
+
+.. _faq-argument-vs-parameter:
+
+What is the difference between arguments and parameters?
+--------------------------------------------------------
+
+:term:`Parameters <parameter>` are defined by the names that appear in a
+function definition, whereas :term:`arguments <argument>` are the values
+actually passed to a function when calling it.  Parameters define what types of
+arguments a function can accept.  For example, given the function definition::
+
+   def func(foo, bar=None, **kwargs):
+       pass
+
+*foo*, *bar* and *kwargs* are parameters of ``func``.  However, when calling
+``func``, for example::
+
+   func(42, bar=314, extra=somevar)
+
+the values ``42``, ``314``, and ``somevar`` are arguments.
 
 
 How do I write a function with output parameters (call by reference)?
@@ -669,11 +804,11 @@ Comma is not an operator in Python.  Consider this session::
 Since the comma is not an operator, but a separator between expressions the
 above is evaluated as if you had entered::
 
-    >>> ("a" in "b"), "a"
+    ("a" in "b"), "a"
 
 not::
 
-    >>> "a" in ("b", "a")
+    "a" in ("b", "a")
 
 The same is true of the various assignment operators (``=``, ``+=`` etc).  They
 are not truly operators but syntactic delimiters in assignment statements.
@@ -691,52 +826,6 @@ Yes, this feature was added in Python 2.5. The syntax would be as follows::
    small = x if x < y else y
 
 For versions previous to 2.5 the answer would be 'No'.
-
-.. XXX remove rest?
-
-In many cases you can mimic ``a ? b : c`` with ``a and b or c``, but there's a
-flaw: if *b* is zero (or empty, or ``None`` -- anything that tests false) then
-*c* will be selected instead.  In many cases you can prove by looking at the
-code that this can't happen (e.g. because *b* is a constant or has a type that
-can never be false), but in general this can be a problem.
-
-Tim Peters (who wishes it was Steve Majewski) suggested the following solution:
-``(a and [b] or [c])[0]``.  Because ``[b]`` is a singleton list it is never
-false, so the wrong path is never taken; then applying ``[0]`` to the whole
-thing gets the *b* or *c* that you really wanted.  Ugly, but it gets you there
-in the rare cases where it is really inconvenient to rewrite your code using
-'if'.
-
-The best course is usually to write a simple ``if...else`` statement.  Another
-solution is to implement the ``?:`` operator as a function::
-
-   def q(cond, on_true, on_false):
-       if cond:
-           if not isfunction(on_true):
-               return on_true
-           else:
-               return on_true()
-       else:
-           if not isfunction(on_false):
-               return on_false
-           else:
-               return on_false()
-
-In most cases you'll pass b and c directly: ``q(a, b, c)``.  To avoid evaluating
-b or c when they shouldn't be, encapsulate them within a lambda function, e.g.:
-``q(a, lambda: b, lambda: c)``.
-
-It has been asked *why* Python has no if-then-else expression.  There are
-several answers: many languages do just fine without one; it can easily lead to
-less readable code; no sufficiently "Pythonic" syntax has been discovered; a
-search of the standard library found remarkably few places where using an
-if-then-else expression would make the code more understandable.
-
-In 2002, :pep:`308` was written proposing several possible syntaxes and the
-community was asked to vote on the issue.  The vote was inconclusive.  Most
-people liked one of the syntaxes, but also hated other syntaxes; many votes
-implied that people preferred no ternary operator rather than having a syntax
-they hated.
 
 
 Is it possible to write obfuscated one-liners in Python?
@@ -864,6 +953,7 @@ How do I modify a string in place?
 You can't, because strings are immutable.  If you need an object with this
 ability, try converting the string to a list or use the array module::
 
+   >>> import io
    >>> s = "Hello, world"
    >>> a = list(s)
    >>> print a
@@ -876,8 +966,8 @@ ability, try converting the string to a list or use the array module::
    >>> a = array.array('c', s)
    >>> print a
    array('c', 'Hello, world')
-   >>> a[0] = 'y' ; print a
-   array('c', 'yello world')
+   >>> a[0] = 'y'; print a
+   array('c', 'yello, world')
    >>> a.tostring()
    'yello, world'
 
@@ -980,7 +1070,7 @@ and then convert decimal strings to numeric values using :func:`int` or
 if the line uses something other than whitespace as a separator.
 
 For more complicated input parsing, regular expressions are more powerful
-than C's :cfunc:`sscanf` and better suited for the task.
+than C's :c:func:`sscanf` and better suited for the task.
 
 
 What does 'UnicodeError: ASCII [decoding,encoding] error: ordinal not in range(128)' mean?
@@ -1139,7 +1229,7 @@ How do I create a multidimensional list?
 
 You probably tried to make a multidimensional array like this::
 
-   A = [[None] * 2] * 3
+   >>> A = [[None] * 2] * 3
 
 This looks correct if you print it::
 
@@ -1171,7 +1261,7 @@ use a list comprehension::
    A = [[None] * w for i in range(h)]
 
 Or, you can use an extension that provides a matrix datatype; `Numeric Python
-<http://numpy.scipy.org/>`_ is the best known.
+<http://www.numpy.org/>`_ is the best known.
 
 
 How do I apply a method to a sequence of objects?
@@ -1188,6 +1278,92 @@ More generically, you can try the following function::
        nobjects = len(objects)
        methods = map(getattr, objects, [method]*nobjects)
        return map(apply, methods, [arguments]*nobjects)
+
+
+Why does a_tuple[i] += ['item'] raise an exception when the addition works?
+---------------------------------------------------------------------------
+
+This is because of a combination of the fact that augmented assignment
+operators are *assignment* operators, and the difference between mutable and
+immutable objects in Python.
+
+This discussion applies in general when augmented assignment operators are
+applied to elements of a tuple that point to mutable objects, but we'll use
+a ``list`` and ``+=`` as our exemplar.
+
+If you wrote::
+
+   >>> a_tuple = (1, 2)
+   >>> a_tuple[0] += 1
+   Traceback (most recent call last):
+      ...
+   TypeError: 'tuple' object does not support item assignment
+
+The reason for the exception should be immediately clear: ``1`` is added to the
+object ``a_tuple[0]`` points to (``1``), producing the result object, ``2``,
+but when we attempt to assign the result of the computation, ``2``, to element
+``0`` of the tuple, we get an error because we can't change what an element of
+a tuple points to.
+
+Under the covers, what this augmented assignment statement is doing is
+approximately this::
+
+   >>> result = a_tuple[0] + 1
+   >>> a_tuple[0] = result
+   Traceback (most recent call last):
+     ...
+   TypeError: 'tuple' object does not support item assignment
+
+It is the assignment part of the operation that produces the error, since a
+tuple is immutable.
+
+When you write something like::
+
+   >>> a_tuple = (['foo'], 'bar')
+   >>> a_tuple[0] += ['item']
+   Traceback (most recent call last):
+     ...
+   TypeError: 'tuple' object does not support item assignment
+
+The exception is a bit more surprising, and even more surprising is the fact
+that even though there was an error, the append worked::
+
+    >>> a_tuple[0]
+    ['foo', 'item']
+
+To see why this happens, you need to know that (a) if an object implements an
+``__iadd__`` magic method, it gets called when the ``+=`` augmented assignment
+is executed, and its return value is what gets used in the assignment statement;
+and (b) for lists, ``__iadd__`` is equivalent to calling ``extend`` on the list
+and returning the list.  That's why we say that for lists, ``+=`` is a
+"shorthand" for ``list.extend``::
+
+    >>> a_list = []
+    >>> a_list += [1]
+    >>> a_list
+    [1]
+
+This is equivalent to::
+
+    >>> result = a_list.__iadd__([1])
+    >>> a_list = result
+
+The object pointed to by a_list has been mutated, and the pointer to the
+mutated object is assigned back to ``a_list``.  The end result of the
+assignment is a no-op, since it is a pointer to the same object that ``a_list``
+was previously pointing to, but the assignment still happens.
+
+Thus, in our tuple example what is happening is equivalent to::
+
+   >>> result = a_tuple[0].__iadd__(['item'])
+   >>> a_tuple[0] = result
+   Traceback (most recent call last):
+     ...
+   TypeError: 'tuple' object does not support item assignment
+
+The ``__iadd__`` succeeds, and thus the list is extended, but even though
+``result`` points to the same object that ``a_tuple[0]`` already points to,
+that final assignment still results in an error, because tuples are immutable.
 
 
 Dictionaries
@@ -1604,6 +1780,32 @@ You can program the class's constructor to keep track of all instances by
 keeping a list of weak references to each instance.
 
 
+Why does the result of ``id()`` appear to be not unique?
+--------------------------------------------------------
+
+The :func:`id` builtin returns an integer that is guaranteed to be unique during
+the lifetime of the object.  Since in CPython, this is the object's memory
+address, it happens frequently that after an object is deleted from memory, the
+next freshly created object is allocated at the same position in memory.  This
+is illustrated by this example:
+
+>>> id(1000)
+13901272
+>>> id(2000)
+13901272
+
+The two ids belong to different integer objects that are created before, and
+deleted immediately after execution of the ``id()`` call.  To be sure that
+objects whose id you want to examine are still alive, create another reference
+to the object:
+
+>>> a = 1000; b = 2000
+>>> id(a)
+13901272
+>>> id(b)
+13891296
+
+
 Modules
 =======
 
@@ -1621,13 +1823,13 @@ file is automatic if you're importing a module and Python has the ability
 (permissions, free space, etc...) to write the compiled module back to the
 directory.
 
-Running Python on a top level script is not considered an import and no ``.pyc``
-will be created.  For example, if you have a top-level module ``abc.py`` that
-imports another module ``xyz.py``, when you run abc, ``xyz.pyc`` will be created
-since xyz is imported, but no ``abc.pyc`` file will be created since ``abc.py``
-isn't being imported.
+Running Python on a top level script is not considered an import and no
+``.pyc`` will be created.  For example, if you have a top-level module
+``foo.py`` that imports another module ``xyz.py``, when you run ``foo``,
+``xyz.pyc`` will be created since ``xyz`` is imported, but no ``foo.pyc`` file
+will be created since ``foo.py`` isn't being imported.
 
-If you need to create abc.pyc -- that is, to create a .pyc file for a module
+If you need to create ``foo.pyc`` -- that is, to create a ``.pyc`` file for a module
 that is not imported -- you can, using the :mod:`py_compile` and
 :mod:`compileall` modules.
 
@@ -1635,9 +1837,9 @@ The :mod:`py_compile` module can manually compile any module.  One way is to use
 the ``compile()`` function in that module interactively::
 
    >>> import py_compile
-   >>> py_compile.compile('abc.py')
+   >>> py_compile.compile('foo.py')                 # doctest: +SKIP
 
-This will write the ``.pyc`` to the same location as ``abc.py`` (or you can
+This will write the ``.pyc`` to the same location as ``foo.py`` (or you can
 override that with the optional parameter ``cfile``).
 
 You can also automatically compile all files in a directory or directories using

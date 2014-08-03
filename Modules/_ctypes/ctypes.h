@@ -153,6 +153,7 @@ extern int PyObject_stginfo(PyObject *self, Py_ssize_t *psize, Py_ssize_t *palig
 extern PyTypeObject PyCData_Type;
 #define CDataObject_CheckExact(v)       ((v)->ob_type == &PyCData_Type)
 #define CDataObject_Check(v)            PyObject_TypeCheck(v, &PyCData_Type)
+#define _CDataObject_HasExternalBuffer(v)  ((v)->b_ptr != (char *)&(v)->b_value)
 
 extern PyTypeObject PyCSimpleType_Type;
 #define PyCSimpleTypeObject_CheckExact(v)       ((v)->ob_type == &PyCSimpleType_Type)
@@ -433,6 +434,9 @@ extern void _ctypes_add_traceback(char *, char *, int);
 
 extern PyObject *PyCData_FromBaseObj(PyObject *type, PyObject *base, Py_ssize_t index, char *adr);
 extern char *_ctypes_alloc_format_string(const char *prefix, const char *suffix);
+extern char *_ctypes_alloc_format_string_with_shape(int ndim,
+                                                const Py_ssize_t *shape,
+                                                const char *prefix, const char *suffix);
 
 extern int _ctypes_simple_instance(PyObject *obj);
 

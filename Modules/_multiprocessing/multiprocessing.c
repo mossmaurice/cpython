@@ -8,7 +8,7 @@
 
 #include "multiprocessing.h"
 
-#ifdef SCM_RIGHTS
+#if (defined(CMSG_LEN) && defined(SCM_RIGHTS))
     #define HAVE_FD_TRANSFER 1
 #else
     #define HAVE_FD_TRANSFER 0
@@ -63,7 +63,7 @@ mp_SetError(PyObject *Type, int num)
         break;
     default:
         PyErr_Format(PyExc_RuntimeError,
-                     "unkown error number %d", num);
+                     "unknown error number %d", num);
     }
     return NULL;
 }

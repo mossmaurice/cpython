@@ -27,6 +27,9 @@ import socket
 import os
 import time
 import sys
+import base64
+import re
+
 from urlparse import urljoin as basejoin
 
 __all__ = ["urlopen", "URLopener", "FancyURLopener", "urlretrieve",
@@ -318,13 +321,13 @@ class URLopener:
         if not host: raise IOError, ('http error', 'no host given')
 
         if proxy_passwd:
-            import base64
+            proxy_passwd = unquote(proxy_passwd)
             proxy_auth = base64.b64encode(proxy_passwd).strip()
         else:
             proxy_auth = None
 
         if user_passwd:
-            import base64
+            user_passwd = unquote(user_passwd)
             auth = base64.b64encode(user_passwd).strip()
         else:
             auth = None
@@ -374,7 +377,6 @@ class URLopener:
 
     def http_error_default(self, url, fp, errcode, errmsg, headers):
         """Default error handler: close the connection and raise IOError."""
-        void = fp.read()
         fp.close()
         raise IOError, ('http error', errcode, errmsg, headers)
 
@@ -409,12 +411,12 @@ class URLopener:
                 #print "proxy via https:", host, selector
             if not host: raise IOError, ('https error', 'no host given')
             if proxy_passwd:
-                import base64
+                proxy_passwd = unquote(proxy_passwd)
                 proxy_auth = base64.b64encode(proxy_passwd).strip()
             else:
                 proxy_auth = None
             if user_passwd:
-                import base64
+                user_passwd = unquote(user_passwd)
                 auth = base64.b64encode(user_passwd).strip()
             else:
                 auth = None
@@ -483,6 +485,8 @@ class URLopener:
             urlfile = file
             if file[:1] == '/':
                 urlfile = 'file://' + file
+            elif file[:2] == './':
+                raise ValueError("local file url may start with / or file:. Unknown url of type: %s" % url)
             return addinfourl(open(localname, 'rb'),
                               headers, urlfile)
         host, port = splitport(host)
@@ -590,7 +594,6 @@ class URLopener:
                                             time.gmtime(time.time())))
         msg.append('Content-type: %s' % type)
         if encoding == 'base64':
-            import base64
             data = base64.decodestring(data)
         else:
             data = unquote(data)
@@ -640,7 +643,6 @@ class FancyURLopener(URLopener):
             newurl = headers['uri']
         else:
             return
-        void = fp.read()
         fp.close()
         # In case the server sent a relative URL, join with original:
         newurl = basejoin(self.type + ":" + url, newurl)
@@ -817,7 +819,10 @@ def thishost():
     """Return the IP address of the current host."""
     global _thishost
     if _thishost is None:
-        _thishost = socket.gethostbyname(socket.gethostname())
+        try:
+            _thishost = socket.gethostbyname(socket.gethostname())
+        except socket.gaierror:
+            _thishost = socket.gethostbyname('localhost')
     return _thishost
 
 _ftperrors = None
@@ -868,8 +873,8 @@ class ftpwrapper:
         self.ftp = ftplib.FTP()
         self.ftp.connect(self.host, self.port, self.timeout)
         self.ftp.login(self.user, self.passwd)
-        for dir in self.dirs:
-            self.ftp.cwd(dir)
+        _target = '/'.join(self.dirs)
+        self.ftp.cwd(_target)
 
     def retrfile(self, file, type):
         import ftplib
@@ -979,11 +984,11 @@ class addclosehook(addbase):
         self.hookargs = hookargs
 
     def close(self):
-        addbase.close(self)
         if self.closehook:
             self.closehook(*self.hookargs)
             self.closehook = None
             self.hookargs = None
+        addbase.close(self)
 
 class addinfo(addbase):
     """class to add an info() method to an open file."""
@@ -1120,10 +1125,13 @@ def splitport(host):
     global _portprog
     if _portprog is None:
         import re
-        _portprog = re.compile('^(.*):([0-9]+)$')
+        _portprog = re.compile('^(.*):([0-9]*)$')
 
     match = _portprog.match(host)
-    if match: return match.group(1, 2)
+    if match:
+        host, port = match.groups()
+        if port:
+            return host, port
     return host, None
 
 _nportprog = None
@@ -1140,12 +1148,12 @@ def splitnport(host, defport=-1):
     match = _nportprog.match(host)
     if match:
         host, port = match.group(1, 2)
-        try:
-            if not port: raise ValueError, "no digits"
-            nport = int(port)
-        except ValueError:
-            nport = None
-        return host, nport
+        if port:
+            try:
+                nport = int(port)
+            except ValueError:
+                nport = None
+            return host, nport
     return host, defport
 
 _queryprog = None
@@ -1197,22 +1205,35 @@ def splitvalue(attr):
 _hexdig = '0123456789ABCDEFabcdef'
 _hextochr = dict((a + b, chr(int(a + b, 16)))
                  for a in _hexdig for b in _hexdig)
+_asciire = re.compile('([\x00-\x7f]+)')
 
 def unquote(s):
     """unquote('abc%20def') -> 'abc def'."""
-    res = s.split('%')
+    if _is_unicode(s):
+        if '%' not in s:
+            return s
+        bits = _asciire.split(s)
+        res = [bits[0]]
+        append = res.append
+        for i in range(1, len(bits), 2):
+            append(unquote(str(bits[i])).decode('latin1'))
+            append(bits[i + 1])
+        return ''.join(res)
+
+    bits = s.split('%')
     # fastpath
-    if len(res) == 1:
+    if len(bits) == 1:
         return s
-    s = res[0]
-    for item in res[1:]:
+    res = [bits[0]]
+    append = res.append
+    for item in bits[1:]:
         try:
-            s += _hextochr[item[:2]] + item[2:]
+            append(_hextochr[item[:2]])
+            append(item[2:])
         except KeyError:
-            s += '%' + item
-        except UnicodeDecodeError:
-            s += unichr(int(item[:2], 16)) + item[2:]
-    return s
+            append('%')
+            append(item)
+    return ''.join(res)
 
 def unquote_plus(s):
     """unquote('%7e/abc+def') -> '~/abc def'"""

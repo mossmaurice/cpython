@@ -60,6 +60,13 @@ The :mod:`random` module also provides the :class:`SystemRandom` class which
 uses the system function :func:`os.urandom` to generate random numbers
 from sources provided by the operating system.
 
+.. warning::
+
+   The pseudo-random generators of this module should not be used for
+   security purposes.  Use :func:`os.urandom` or :class:`SystemRandom` if
+   you require a cryptographically secure pseudo-random number generator.
+
+
 Bookkeeping functions:
 
 
@@ -90,7 +97,7 @@ Bookkeeping functions:
 
    *state* should have been obtained from a previous call to :func:`getstate`, and
    :func:`setstate` restores the internal state of the generator to what it was at
-   the time :func:`setstate` was called.
+   the time :func:`getstate` was called.
 
    .. versionadded:: 2.1
 
@@ -124,7 +131,8 @@ Bookkeeping functions:
 Functions for integers:
 
 
-.. function:: randrange([start,] stop[, step])
+.. function:: randrange(stop)
+              randrange(start, stop[, step])
 
    Return a randomly selected element from ``range(start, stop, step)``.  This is
    equivalent to ``choice(range(start, stop, step))``, but doesn't actually build a

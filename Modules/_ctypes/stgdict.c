@@ -343,7 +343,7 @@ PyCStructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct
 
     isPacked = PyObject_GetAttrString(type, "_pack_");
     if (isPacked) {
-        pack = PyInt_AsLong(isPacked);
+        pack = _PyInt_AsInt(isPacked);
         if (pack < 0 || PyErr_Occurred()) {
             Py_XDECREF(isPacked);
             PyErr_SetString(PyExc_ValueError,
@@ -518,7 +518,12 @@ PyCStructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct
             sprintf(buf, "%s:%s:", fieldfmt, fieldname);
 
             ptr = stgdict->format;
-            stgdict->format = _ctypes_alloc_format_string(stgdict->format, buf);
+            if (dict->shape != NULL) {
+                stgdict->format = _ctypes_alloc_format_string_with_shape(
+                    dict->ndim, dict->shape, stgdict->format, buf);
+            } else {
+                stgdict->format = _ctypes_alloc_format_string(stgdict->format, buf);
+            }
             PyMem_Free(ptr);
             PyMem_Free(buf);
 

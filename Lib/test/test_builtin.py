@@ -110,6 +110,7 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(TypeError, all)                   # No args
         self.assertRaises(TypeError, all, [2, 4, 6], [])    # Too many args
         self.assertEqual(all([]), True)                     # Empty iterator
+        self.assertEqual(all([0, TestFailingBool()]), False)# Short-circuit
         S = [50, 60]
         self.assertEqual(all(x > 42 for x in S), True)
         S = [50, 40, 60]
@@ -119,11 +120,12 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(any([None, None, None]), False)
         self.assertEqual(any([None, 4, None]), True)
         self.assertRaises(RuntimeError, any, [None, TestFailingBool(), 6])
-        self.assertRaises(RuntimeError, all, TestFailingIter())
+        self.assertRaises(RuntimeError, any, TestFailingIter())
         self.assertRaises(TypeError, any, 10)               # Non-iterable
         self.assertRaises(TypeError, any)                   # No args
         self.assertRaises(TypeError, any, [2, 4, 6], [])    # Too many args
         self.assertEqual(any([]), False)                    # Empty iterator
+        self.assertEqual(any([1, TestFailingBool()]), True) # Short-circuit
         S = [40, 60, 30]
         self.assertEqual(any(x > 42 for x in S), True)
         S = [10, 20, 30]
@@ -445,59 +447,6 @@ class BuiltinTest(unittest.TestCase):
                 return 'a'
         self.assertRaises(TypeError, eval, 'dir()', globals(), C())
 
-    # Done outside of the method test_z to get the correct scope
-    z = 0
-    f = open(TESTFN, 'w')
-    f.write('z = z+1\n')
-    f.write('z = z*2\n')
-    f.close()
-    with check_py3k_warnings(("execfile.. not supported in 3.x",
-                              DeprecationWarning)):
-        execfile(TESTFN)
-
-    def test_execfile(self):
-        global numruns
-        if numruns:
-            return
-        numruns += 1
-
-        globals = {'a': 1, 'b': 2}
-        locals = {'b': 200, 'c': 300}
-
-        self.assertEqual(self.__class__.z, 2)
-        globals['z'] = 0
-        execfile(TESTFN, globals)
-        self.assertEqual(globals['z'], 2)
-        locals['z'] = 0
-        execfile(TESTFN, globals, locals)
-        self.assertEqual(locals['z'], 2)
-
-        class M:
-            "Test mapping interface versus possible calls from execfile()."
-            def __init__(self):
-                self.z = 10
-            def __getitem__(self, key):
-                if key == 'z':
-                    return self.z
-                raise KeyError
-            def __setitem__(self, key, value):
-                if key == 'z':
-                    self.z = value
-                    return
-                raise KeyError
-
-        locals = M()
-        locals['z'] = 0
-        execfile(TESTFN, globals, locals)
-        self.assertEqual(locals['z'], 2)
-
-        unlink(TESTFN)
-        self.assertRaises(TypeError, execfile)
-        self.assertRaises(TypeError, execfile, TESTFN, {}, ())
-        import os
-        self.assertRaises(IOError, execfile, os.curdir)
-        self.assertRaises(IOError, execfile, "I_dont_exist")
-
     def test_filter(self):
         self.assertEqual(filter(lambda c: 'a' <= c <= 'z', 'Hello World'), 'elloorld')
         self.assertEqual(filter(None, [1, 'hello', [], [3], '', None, 9, 0]), [1, 'hello', [3], 9])
@@ -679,6 +628,8 @@ class BuiltinTest(unittest.TestCase):
         id({'spam': 1, 'eggs': 2, 'ham': 3})
 
     # Test input() later, together with raw_input
+
+    # test_int(): see test_int.py for int() tests.
 
     def test_intern(self):
         self.assertRaises(TypeError, intern)
@@ -1642,6 +1593,56 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(ValueError, x.translate, "1", 1)
         self.assertRaises(TypeError, x.translate, "1"*256, 1)
 
+class TestExecFile(unittest.TestCase):
+    # Done outside of the method test_z to get the correct scope
+    z = 0
+    f = open(TESTFN, 'w')
+    f.write('z = z+1\n')
+    f.write('z = z*2\n')
+    f.close()
+    with check_py3k_warnings(("execfile.. not supported in 3.x",
+                              DeprecationWarning)):
+        execfile(TESTFN)
+
+    def test_execfile(self):
+        globals = {'a': 1, 'b': 2}
+        locals = {'b': 200, 'c': 300}
+
+        self.assertEqual(self.__class__.z, 2)
+        globals['z'] = 0
+        execfile(TESTFN, globals)
+        self.assertEqual(globals['z'], 2)
+        locals['z'] = 0
+        execfile(TESTFN, globals, locals)
+        self.assertEqual(locals['z'], 2)
+
+        class M:
+            "Test mapping interface versus possible calls from execfile()."
+            def __init__(self):
+                self.z = 10
+            def __getitem__(self, key):
+                if key == 'z':
+                    return self.z
+                raise KeyError
+            def __setitem__(self, key, value):
+                if key == 'z':
+                    self.z = value
+                    return
+                raise KeyError
+
+        locals = M()
+        locals['z'] = 0
+        execfile(TESTFN, globals, locals)
+        self.assertEqual(locals['z'], 2)
+
+        unlink(TESTFN)
+        self.assertRaises(TypeError, execfile)
+        self.assertRaises(TypeError, execfile, TESTFN, {}, ())
+        import os
+        self.assertRaises(IOError, execfile, os.curdir)
+        self.assertRaises(IOError, execfile, "I_dont_exist")
+
+
 class TestSorted(unittest.TestCase):
 
     def test_basic(self):
@@ -1689,6 +1690,12 @@ def _run_unittest(*args):
         run_unittest(*args)
 
 def test_main(verbose=None):
+    global numruns
+    if not numruns:
+        with check_py3k_warnings(
+                (".+ not supported in 3.x", DeprecationWarning)):
+            run_unittest(TestExecFile)
+    numruns += 1
     test_classes = (BuiltinTest, TestSorted)
 
     _run_unittest(*test_classes)

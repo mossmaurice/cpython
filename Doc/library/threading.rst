@@ -31,10 +31,10 @@ The :mod:`dummy_threading` module is provided for situations where
 
 .. impl-detail::
 
-   Due to the :term:`Global Interpreter Lock`, in CPython only one thread
+   In CPython, due to the :term:`Global Interpreter Lock`, only one thread
    can execute Python code at once (even though certain performance-oriented
    libraries might overcome this limitation).
-   If you want your application to make better of use of the computational
+   If you want your application to make better use of the computational
    resources of multi-core machines, you are advised to use
    :mod:`multiprocessing`. However, threading is still an appropriate model
    if you want to run multiple I/O-bound tasks simultaneously.
@@ -47,6 +47,9 @@ This module defines the following functions and objects:
 
    Return the number of :class:`Thread` objects currently alive.  The returned
    count is equal to the length of the list returned by :func:`.enumerate`.
+
+   .. versionchanged:: 2.6
+      Added ``active_count()`` spelling.
 
 
 .. function:: Condition()
@@ -66,6 +69,9 @@ This module defines the following functions and objects:
    of control.  If the caller's thread of control was not created through the
    :mod:`threading` module, a dummy thread object with limited functionality is
    returned.
+
+   .. versionchanged:: 2.6
+      Added ``current_thread()`` spelling.
 
 
 .. function:: enumerate()
@@ -167,7 +173,7 @@ This module defines the following functions and objects:
 
    Set a trace function for all threads started from the :mod:`threading` module.
    The *func* will be passed to  :func:`sys.settrace` for each thread, before its
-   :meth:`run` method is called.
+   :meth:`~Thread.run` method is called.
 
    .. versionadded:: 2.3
 
@@ -178,7 +184,7 @@ This module defines the following functions and objects:
 
    Set a profile function for all threads started from the :mod:`threading` module.
    The *func* will be passed to  :func:`sys.setprofile` for each thread, before its
-   :meth:`run` method is called.
+   :meth:`~Thread.run` method is called.
 
    .. versionadded:: 2.3
 
@@ -201,6 +207,13 @@ This module defines the following functions and objects:
    Availability: Windows, systems with POSIX threads.
 
    .. versionadded:: 2.5
+
+
+.. exception:: ThreadError
+
+   Raised for various threading-related errors as described below.  Note that
+   many interfaces use :exc:`RuntimeError` instead of :exc:`ThreadError`.
+
 
 Detailed interfaces for the objects are documented below.
 
@@ -246,6 +259,12 @@ A thread can be flagged as a "daemon thread".  The significance of this flag is
 that the entire Python program exits when only daemon threads are left.  The
 initial value is inherited from the creating thread.  The flag can be set
 through the :attr:`daemon` property.
+
+.. note::
+   Daemon threads are abruptly stopped at shutdown.  Their resources (such
+   as open files, database transactions, etc.) may not be released properly.
+   If you want your threads to stop gracefully, make them non-daemonic and
+   use a suitable signalling mechanism such as an :class:`Event`.
 
 There is a "main thread" object; this corresponds to the initial thread of
 control in the Python program.  It is not a daemon thread.
@@ -322,16 +341,18 @@ impossible to detect the termination of alien threads.
       :meth:`join` a thread before it has been started and attempts to do so
       raises the same exception.
 
-   .. method:: getName()
-               setName()
-
-      Old API for :attr:`~Thread.name`.
-
    .. attribute:: name
 
       A string used for identification purposes only. It has no semantics.
       Multiple threads may be given the same name.  The initial name is set by
       the constructor.
+
+      .. versionadded:: 2.6
+
+   .. method:: getName()
+               setName()
+
+      Pre-2.6 API for :attr:`~Thread.name`.
 
    .. attribute:: ident
 
@@ -352,10 +373,8 @@ impossible to detect the termination of alien threads.
       until just after the :meth:`run` method terminates.  The module function
       :func:`.enumerate` returns a list of all alive threads.
 
-   .. method:: isDaemon()
-               setDaemon()
-
-      Old API for :attr:`~Thread.daemon`.
+      .. versionchanged:: 2.6
+         Added ``is_alive()`` spelling.
 
    .. attribute:: daemon
 
@@ -367,6 +386,13 @@ impossible to detect the termination of alien threads.
       = ``False``.
 
       The entire Python program exits when no alive non-daemon threads are left.
+
+      .. versionadded:: 2.6
+
+   .. method:: isDaemon()
+               setDaemon()
+
+      Pre-2.6 API for :attr:`~Thread.daemon`.
 
 
 .. _lock-objects:
@@ -387,7 +413,7 @@ blocks until a call to :meth:`release` in another thread changes it to unlocked,
 then the :meth:`acquire` call resets it to locked and returns.  The
 :meth:`release` method should only be called in the locked state; it changes the
 state to unlocked and returns immediately. If an attempt is made to release an
-unlocked lock, a :exc:`RuntimeError` will be raised.
+unlocked lock, a :exc:`ThreadError` will be raised.
 
 When more than one thread is blocked in :meth:`acquire` waiting for the state to
 turn to unlocked, only one thread proceeds when a :meth:`release` call resets
@@ -401,15 +427,12 @@ All methods are executed atomically.
 
    Acquire a lock, blocking or non-blocking.
 
-   When invoked without arguments, block until the lock is unlocked, then set it to
-   locked, and return true.
+   When invoked with the *blocking* argument set to ``True`` (the default),
+   block until the lock is unlocked, then set it to locked and return ``True``.
 
-   When invoked with the *blocking* argument set to true, do the same thing as when
-   called without arguments, and return true.
-
-   When invoked with the *blocking* argument set to false, do not block.  If a call
-   without an argument would block, return false immediately; otherwise, do the
-   same thing as when called without arguments, and return true.
+   When invoked with the *blocking* argument set to ``False``, do not block.
+   If a call with *blocking* set to ``True`` would block, return ``False``
+   immediately; otherwise, set the lock to locked and return ``True``.
 
 
 .. method:: Lock.release()
@@ -420,7 +443,7 @@ All methods are executed atomically.
    are blocked waiting for the lock to become unlocked, allow exactly one of them
    to proceed.
 
-   Do not call this method when the lock is unlocked.
+   When invoked on an unlocked lock, a :exc:`ThreadError` is raised.
 
    There is no return value.
 
@@ -599,6 +622,9 @@ needs to wake up one consumer thread.
       calling thread has not acquired the lock when this method is called, a
       :exc:`RuntimeError` is raised.
 
+      .. versionchanged:: 2.6
+         Added ``notify_all()`` spelling.
+
 
 .. _semaphore-objects:
 
@@ -698,7 +724,7 @@ An event object manages an internal flag that can be set to true with the
       Return true if and only if the internal flag is true.
 
       .. versionchanged:: 2.6
-         The ``is_set()`` syntax is new.
+         Added ``is_set()`` spelling.
 
    .. method:: set()
 
@@ -739,10 +765,11 @@ This class represents an action that should be run only after a certain amount
 of time has passed --- a timer.  :class:`Timer` is a subclass of :class:`Thread`
 and as such also functions as an example of creating custom threads.
 
-Timers are started, as with threads, by calling their :meth:`start` method.  The
-timer can be stopped (before its action has begun) by calling the :meth:`cancel`
-method.  The interval the timer will wait before executing its action may not be
-exactly the same as the interval specified by the user.
+Timers are started, as with threads, by calling their :meth:`~Timer.start`
+method.  The timer can be stopped (before its action has begun) by calling the
+:meth:`~Timer.cancel` method.  The interval the timer will wait before
+executing its action may not be exactly the same as the interval specified by
+the user.
 
 For example::
 

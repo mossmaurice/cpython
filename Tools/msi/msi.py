@@ -177,6 +177,8 @@ mingw_lib = os.path.join(srcdir, PCBUILD, "libpython%s%s.a" % (major, minor))
 have_mingw = build_mingw_lib(lib_file, def_file, dll_file, mingw_lib)
 
 # Determine the target architecture
+if os.system("nmake /nologo /c /f msisupport.mak") != 0:
+    raise RuntimeError("'nmake /f msisupport.mak' failed")
 dll_path = os.path.join(srcdir, PCBUILD, dll_file)
 msilib.set_arch_from_file(dll_path)
 if msilib.pe_type(dll_path) != msilib.pe_type("msisupport.dll"):
@@ -374,8 +376,6 @@ def add_ui(db):
     # UpdateEditIDLE sets the REGISTRY.tcl component into
     # the installed/uninstalled state according to both the
     # Extensions and TclTk features.
-    if os.system("nmake /nologo /c /f msisupport.mak") != 0:
-        raise "'nmake /f msisupport.mak' failed"
     add_data(db, "Binary", [("Script", msilib.Binary("msisupport.dll"))])
     # See "Custom Action Type 1"
     if msilib.Win64:
@@ -445,6 +445,10 @@ def add_ui(db):
               ("SetDLLDirToTarget", 'DLLDIR=""', 751),
              ])
 
+    # Prepend TARGETDIR to the system path, and remove it on uninstall.
+    add_data(db, "Environment",
+             [("PathAddition", "=-*Path", "[TARGETDIR];[~]", "REGISTRY.path")])
+
     # Execute Sequences
     add_data(db, "InstallExecuteSequence",
             [("InitialTargetDir", 'TARGETDIR=""', 750),
@@ -495,7 +499,7 @@ def add_ui(db):
 
     exit_dialog = PyDialog(db, "ExitDialog", x, y, w, h, modal, title,
                          "Finish", "Finish", "Finish")
-    exit_dialog.title("Completing the [ProductName] Installer")
+    exit_dialog.title("Complete the [ProductName] Installer")
     exit_dialog.back("< Back", "Finish", active = 0)
     exit_dialog.cancel("Cancel", "Back", active = 0)
     exit_dialog.text("Acknowledgements", 135, 95, 220, 120, 0x30003,
@@ -668,11 +672,11 @@ def add_ui(db):
     c=features.xbutton("Advanced", "Advanced", None, 0.30)
     c.event("SpawnDialog", "AdvancedDlg")
 
-    c=features.text("ItemDescription", 140, 180, 210, 30, 3,
+    c=features.text("ItemDescription", 140, 180, 210, 40, 3,
                   "Multiline description of the currently selected item.")
     c.mapping("SelectionDescription","Text")
 
-    c=features.text("ItemSize", 140, 210, 210, 45, 3,
+    c=features.text("ItemSize", 140, 225, 210, 33, 3,
                     "The size of the currently selected item.")
     c.mapping("SelectionSize", "Text")
 
@@ -826,7 +830,7 @@ def add_features(db):
     # (i.e. additional Python libraries) need to follow the parent feature.
     # Features that have no advertisement trigger (e.g. the test suite)
     # must not support advertisement
-    global default_feature, tcltk, htmlfiles, tools, testsuite, ext_feature, private_crt
+    global default_feature, tcltk, htmlfiles, tools, testsuite, ext_feature, private_crt, prepend_path
     default_feature = Feature(db, "DefaultFeature", "Python",
                               "Python Interpreter and Libraries",
                               1, directory = "TARGETDIR")
@@ -851,6 +855,15 @@ def add_features(db):
     testsuite = Feature(db, "Testsuite", "Test suite",
                         "Python test suite (Lib/test/)", 11,
                         parent = default_feature, attributes=2|8)
+    # prepend_path is an additional feature which is to be off by default.
+    # Since the default level for the above features is 1, this needs to be
+    # at least level higher.
+    prepend_path = Feature(db, "PrependPath", "Add python.exe to Path",
+                           "Prepend [TARGETDIR] to the system Path variable. "
+                           "This allows you to type 'python' into a command "
+                           "prompt without needing the full path.", 13,
+                           parent = default_feature, attributes=2|8,
+                           level=2)
 
 def extract_msvcr90():
     # Find the redistributable files
@@ -1022,8 +1035,12 @@ def add_files(db):
             lib.add_file("zipdir.zip")
         if dir=='tests' and parent.physical=='distutils':
             lib.add_file("Setup.sample")
+        if dir=='audiodata':
+            lib.glob("*.*")
         if dir=='decimaltestdata':
             lib.glob("*.decTest")
+        if dir=='imghdrdata':
+            lib.glob("*.*")
         if dir=='xmltestdata':
             lib.glob("*.xml")
             lib.add_file("test.xml.out")
@@ -1034,6 +1051,7 @@ def add_files(db):
             lib.add_file("idle.bat")
         if dir=="Icons":
             lib.glob("*.gif")
+            lib.glob("*.ico")
             lib.add_file("idle.icns")
         if dir=="command" and parent.physical=="distutils":
             lib.glob("wininst*.exe")
@@ -1168,6 +1186,8 @@ def add_registry(db):
                "InstallPath"),
               ("REGISTRY.doc", msilib.gen_uuid(), "TARGETDIR", registry_component, None,
                "Documentation"),
+              ("REGISTRY.path", msilib.gen_uuid(), "TARGETDIR", registry_component, None,
+               None),
               ("REGISTRY.def", msilib.gen_uuid(), "TARGETDIR", registry_component,
                None, None)] + tcldata)
     # See "FeatureComponents Table".
@@ -1184,6 +1204,7 @@ def add_registry(db):
     add_data(db, "FeatureComponents",
              [(default_feature.id, "REGISTRY"),
               (htmlfiles.id, "REGISTRY.doc"),
+              (prepend_path.id, "REGISTRY.path"),
               (ext_feature.id, "REGISTRY.def")] +
               tcldata
               )
@@ -1392,7 +1413,10 @@ merge(msiname, "SharedCRT", "TARGETDIR", modules)
 # certname (from config.py) should be (a substring of)
 # the certificate subject, e.g. "Python Software Foundation"
 if certname:
-    os.system('signtool sign /n "%s" /t http://timestamp.verisign.com/scripts/timestamp.dll %s' % (certname, msiname))
+    os.system('signtool sign /n "%s" '
+      '/t http://timestamp.verisign.com/scripts/timestamp.dll '
+      '/d "Python %s" '
+      '%s' % (certname, full_current_version, msiname))
 
 if pdbzip:
     build_pdbzip()

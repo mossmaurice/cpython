@@ -114,7 +114,7 @@ comment1b-->
 <Img sRc='Bar' isMAP>sample
 text
 &#x201C;
-<!--comment2a-- --comment2b--><!>
+<!--comment2a-- --comment2b-->
 </Html>
 """, [
     ("data", "\n"),
@@ -142,24 +142,6 @@ text
             ("data", " foo"),
             ])
 
-    def test_doctype_decl(self):
-        inside = """\
-DOCTYPE html [
-  <!ELEMENT html - O EMPTY>
-  <!ATTLIST html
-      version CDATA #IMPLIED
-      profile CDATA 'DublinCore'>
-  <!NOTATION datatype SYSTEM 'http://xml.python.org/notations/python-module'>
-  <!ENTITY myEntity 'internal parsed entity'>
-  <!ENTITY anEntity SYSTEM 'http://xml.python.org/entities/something.xml'>
-  <!ENTITY % paramEntity 'name|name|name'>
-  %paramEntity;
-  <!-- comment -->
-]"""
-        self._run_check("<!%s>" % inside, [
-            ("decl", inside),
-            ])
-
     def test_bad_nesting(self):
         # Strangely, this *is* supposed to test that overlapping
         # elements are allowed.  HTMLParser is more geared toward
@@ -182,7 +164,8 @@ DOCTYPE html [
             ])
 
     def test_illegal_declarations(self):
-        self._parse_error('<!spacer type="block" height="25">')
+        self._run_check('<!spacer type="block" height="25">',
+                        [('comment', 'spacer type="block" height="25"')])
 
     def test_starttag_end_boundary(self):
         self._run_check("""<a b='<'>""", [("starttag", "a", [("b", "<")])])
@@ -219,21 +202,81 @@ DOCTYPE html [
         self._run_check(["<!--abc-->", ""], output)
 
     def test_starttag_junk_chars(self):
-        self._parse_error("</>")
-        self._parse_error("</$>")
-        self._parse_error("</")
-        self._parse_error("</a")
-        self._parse_error("<a<a>")
-        self._parse_error("</a<a>")
-        self._parse_error("<!")
-        self._parse_error("<a")
-        self._parse_error("<a foo='bar'")
-        self._parse_error("<a foo='bar")
-        self._parse_error("<a foo='>'")
-        self._parse_error("<a foo='>")
+        self._run_check("</>", [])
+        self._run_check("</$>", [('comment', '$')])
+        self._run_check("</", [('data', '</')])
+        self._run_check("</a", [('data', '</a')])
+        self._run_check("<a<a>", [('starttag', 'a<a', [])])
+        self._run_check("</a<a>", [('endtag', 'a<a')])
+        self._run_check("<!", [('data', '<!')])
+        self._run_check("<a", [('data', '<a')])
+        self._run_check("<a foo='bar'", [('data', "<a foo='bar'")])
+        self._run_check("<a foo='bar", [('data', "<a foo='bar")])
+        self._run_check("<a foo='>'", [('data', "<a foo='>'")])
+        self._run_check("<a foo='>", [('data', "<a foo='>")])
+        self._run_check("<a$>", [('starttag', 'a$', [])])
+        self._run_check("<a$b>", [('starttag', 'a$b', [])])
+        self._run_check("<a$b/>", [('startendtag', 'a$b', [])])
+        self._run_check("<a$b  >", [('starttag', 'a$b', [])])
+        self._run_check("<a$b  />", [('startendtag', 'a$b', [])])
+
+    def test_valid_doctypes(self):
+        # from http://www.w3.org/QA/2002/04/valid-dtd-list.html
+        dtds = ['HTML',  # HTML5 doctype
+                ('HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" '
+                 '"http://www.w3.org/TR/html4/strict.dtd"'),
+                ('HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" '
+                 '"http://www.w3.org/TR/html4/loose.dtd"'),
+                ('html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" '
+                 '"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"'),
+                ('html PUBLIC "-//W3C//DTD XHTML 1.0 Frameset//EN" '
+                 '"http://www.w3.org/TR/xhtml1/DTD/xhtml1-frameset.dtd"'),
+                ('math PUBLIC "-//W3C//DTD MathML 2.0//EN" '
+                 '"http://www.w3.org/Math/DTD/mathml2/mathml2.dtd"'),
+                ('html PUBLIC "-//W3C//DTD '
+                 'XHTML 1.1 plus MathML 2.0 plus SVG 1.1//EN" '
+                 '"http://www.w3.org/2002/04/xhtml-math-svg/xhtml-math-svg.dtd"'),
+                ('svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '
+                 '"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"'),
+                'html PUBLIC "-//IETF//DTD HTML 2.0//EN"',
+                'html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN"']
+        for dtd in dtds:
+            self._run_check("<!DOCTYPE %s>" % dtd,
+                            [('decl', 'DOCTYPE ' + dtd)])
+
+    def test_slashes_in_starttag(self):
+        self._run_check('<a foo="var"/>', [('startendtag', 'a', [('foo', 'var')])])
+        html = ('<img width=902 height=250px '
+                'src="/sites/default/files/images/homepage/foo.jpg" '
+                '/*what am I doing here*/ />')
+        expected = [(
+            'startendtag', 'img',
+            [('width', '902'), ('height', '250px'),
+             ('src', '/sites/default/files/images/homepage/foo.jpg'),
+             ('*what', None), ('am', None), ('i', None),
+             ('doing', None), ('here*', None)]
+        )]
+        self._run_check(html, expected)
+        html = ('<a / /foo/ / /=/ / /bar/ / />'
+                '<a / /foo/ / /=/ / /bar/ / >')
+        expected = [
+            ('startendtag', 'a', [('foo', None), ('=', None), ('bar', None)]),
+            ('starttag', 'a', [('foo', None), ('=', None), ('bar', None)])
+        ]
+        self._run_check(html, expected)
+        #see issue #14538
+        html = ('<meta><meta / ><meta // ><meta / / >'
+                '<meta/><meta /><meta //><meta//>')
+        expected = [
+            ('starttag', 'meta', []), ('starttag', 'meta', []),
+            ('starttag', 'meta', []), ('starttag', 'meta', []),
+            ('startendtag', 'meta', []), ('startendtag', 'meta', []),
+            ('startendtag', 'meta', []), ('startendtag', 'meta', []),
+        ]
+        self._run_check(html, expected)
 
     def test_declaration_junk_chars(self):
-        self._parse_error("<!DOCTYPE foo $ >")
+        self._run_check("<!DOCTYPE foo $ >", [('decl', 'DOCTYPE foo $ ')])
 
     def test_startendtag(self):
         self._run_check("<p/>", [
@@ -248,6 +291,44 @@ DOCTYPE html [
             ("startendtag", "img", [("src", "foo")]),
             ("endtag", "p"),
             ])
+
+    def test_invalid_end_tags(self):
+        # A collection of broken end tags. <br> is used as separator.
+        # see http://www.w3.org/TR/html5/tokenization.html#end-tag-open-state
+        # and #13993
+        html = ('<br></label</p><br></div end tmAd-leaderBoard><br></<h4><br>'
+                '</li class="unit"><br></li\r\n\t\t\t\t\t\t</ul><br></><br>')
+        expected = [('starttag', 'br', []),
+                    # < is part of the name, / is discarded, p is an attribute
+                    ('endtag', 'label<'),
+                    ('starttag', 'br', []),
+                    # text and attributes are discarded
+                    ('endtag', 'div'),
+                    ('starttag', 'br', []),
+                    # comment because the first char after </ is not a-zA-Z
+                    ('comment', '<h4'),
+                    ('starttag', 'br', []),
+                    # attributes are discarded
+                    ('endtag', 'li'),
+                    ('starttag', 'br', []),
+                    # everything till ul (included) is discarded
+                    ('endtag', 'li'),
+                    ('starttag', 'br', []),
+                    # </> is ignored
+                    ('starttag', 'br', [])]
+        self._run_check(html, expected)
+
+    def test_broken_invalid_end_tag(self):
+        # This is technically wrong (the "> shouldn't be included in the 'data')
+        # but is probably not worth fixing it (in addition to all the cases of
+        # the previous test, it would require a full attribute parsing).
+        # see #13993
+        html = '<b>This</b attr=">"> confuses the parser'
+        expected = [('starttag', 'b', []),
+                    ('data', 'This'),
+                    ('endtag', 'b'),
+                    ('data', '"> confuses the parser')]
+        self._run_check(html, expected)
 
     def test_get_starttag_text(self):
         s = """<foo:bar   \n   one="1"\ttwo=2   >"""
@@ -312,6 +393,12 @@ DOCTYPE html [
             ("starttag", "p", []),
             ("data", "&#bad;"),
             ("endtag", "p"),
+        ])
+        # add the [] as a workaround to avoid buffering (see #20288)
+        self._run_check(["<div>&#bad;</div>"], [
+            ("starttag", "div", []),
+            ("data", "&#bad;"),
+            ("endtag", "div"),
         ])
 
     def test_unescape_function(self):
@@ -448,6 +535,81 @@ class AttributesTestCase(TestCaseBase):
                         [("starttag", "a",
                           [("href", "http://www.example.org/\">;")]),
                          ("data", "spam"), ("endtag", "a")])
+
+    def test_comments(self):
+        html = ("<!-- I'm a valid comment -->"
+                '<!--me too!-->'
+                '<!------>'
+                '<!---->'
+                '<!----I have many hyphens---->'
+                '<!-- I have a > in the middle -->'
+                '<!-- and I have -- in the middle! -->')
+        expected = [('comment', " I'm a valid comment "),
+                    ('comment', 'me too!'),
+                    ('comment', '--'),
+                    ('comment', ''),
+                    ('comment', '--I have many hyphens--'),
+                    ('comment', ' I have a > in the middle '),
+                    ('comment', ' and I have -- in the middle! ')]
+        self._run_check(html, expected)
+
+    def test_broken_comments(self):
+        html = ('<! not really a comment >'
+                '<! not a comment either -->'
+                '<! -- close enough -->'
+                '<!><!<-- this was an empty comment>'
+                '<!!! another bogus comment !!!>')
+        expected = [
+            ('comment', ' not really a comment '),
+            ('comment', ' not a comment either --'),
+            ('comment', ' -- close enough --'),
+            ('comment', ''),
+            ('comment', '<-- this was an empty comment'),
+            ('comment', '!! another bogus comment !!!'),
+        ]
+        self._run_check(html, expected)
+
+    def test_condcoms(self):
+        html = ('<!--[if IE & !(lte IE 8)]>aren\'t<![endif]-->'
+                '<!--[if IE 8]>condcoms<![endif]-->'
+                '<!--[if lte IE 7]>pretty?<![endif]-->')
+        expected = [('comment', "[if IE & !(lte IE 8)]>aren't<![endif]"),
+                    ('comment', '[if IE 8]>condcoms<![endif]'),
+                    ('comment', '[if lte IE 7]>pretty?<![endif]')]
+        self._run_check(html, expected)
+
+    def test_broken_condcoms(self):
+        # these condcoms are missing the '--' after '<!' and before the '>'
+        html = ('<![if !(IE)]>broken condcom<![endif]>'
+                '<![if ! IE]><link href="favicon.tiff"/><![endif]>'
+                '<![if !IE 6]><img src="firefox.png" /><![endif]>'
+                '<![if !ie 6]><b>foo</b><![endif]>'
+                '<![if (!IE)|(lt IE 9)]><img src="mammoth.bmp" /><![endif]>')
+        # According to the HTML5 specs sections "8.2.4.44 Bogus comment state"
+        # and "8.2.4.45 Markup declaration open state", comment tokens should
+        # be emitted instead of 'unknown decl', but calling unknown_decl
+        # provides more flexibility.
+        # See also Lib/_markupbase.py:parse_declaration
+        expected = [
+            ('unknown decl', 'if !(IE)'),
+            ('data', 'broken condcom'),
+            ('unknown decl', 'endif'),
+            ('unknown decl', 'if ! IE'),
+            ('startendtag', 'link', [('href', 'favicon.tiff')]),
+            ('unknown decl', 'endif'),
+            ('unknown decl', 'if !IE 6'),
+            ('startendtag', 'img', [('src', 'firefox.png')]),
+            ('unknown decl', 'endif'),
+            ('unknown decl', 'if !ie 6'),
+            ('starttag', 'b', []),
+            ('data', 'foo'),
+            ('endtag', 'b'),
+            ('unknown decl', 'endif'),
+            ('unknown decl', 'if (!IE)|(lt IE 9)'),
+            ('startendtag', 'img', [('src', 'mammoth.bmp')]),
+            ('unknown decl', 'endif')
+        ]
+        self._run_check(html, expected)
 
 
 def test_main():
